@@ -1,11 +1,14 @@
 use std::fmt::{Display, Formatter};
 use rand::prelude::ThreadRng;
-use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
+use rsa::{Oaep, Pkcs1v15Encrypt, Pkcs1v15Sign, Pss, RsaPrivateKey, RsaPublicKey};
+use rsa::pkcs1v15::SigningKey;
+use rsa::sha2::Sha256;
+use rsa::signature::{RandomizedSigner, Signer};
 use rsa::traits::PublicKeyParts;
 use crate::transaction::Transaction;
 
 /// Returns the bytes representation of a public key
-fn public_key_to_bytes<K: PublicKeyParts>(key: &K) -> Vec<u8> {
+pub fn public_key_to_bytes<K: PublicKeyParts>(key: &K) -> Vec<u8> {
     let n_bytes = key.n().to_bytes_be(); // Big-endian byte array of modulus
     let e_bytes = key.e().to_bytes_be(); // Big-endian byte array of exponent
     [n_bytes, e_bytes].concat()
@@ -41,10 +44,12 @@ impl Client {
     ///
     /// Returns None if client does not have enough money.
     pub fn emit_transaction(&mut self, receiver: RsaPublicKey, amount: u64) -> Result<Transaction, Box<dyn std::error::Error>> {
+        // Check that the client can emit the message
+        // Note that the amount is not updated `yet`...
+        // The transaction first has to be mined
         if self.amount < amount {
             return Err(Box::new(TransactionError::NotEnoughSold));
         }
-        self.amount -= amount;
 
         // build the message
         let part1 = public_key_to_bytes(&self.public_key);
@@ -53,14 +58,16 @@ impl Client {
         let data = [part1, part2, Vec::from(part3)].concat();
 
         // sign the message
-        let signature = self.public_key.encrypt(&mut self.rng, Pkcs1v15Encrypt, &data)?;
+        let signing_key = SigningKey::<Sha256>::new(self.private_key.clone());
+        let signature = signing_key.sign_with_rng(&mut self.rng, &data);
 
         // Message is constructed
         Ok(Transaction::new(self.public_key.clone(), receiver, signature, amount))
     }
 
-
-
+    pub fn public_key(&self) -> RsaPublicKey {
+        self.public_key.clone()
+    }
 }
 
 #[derive(Debug)]
