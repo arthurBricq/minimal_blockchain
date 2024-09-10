@@ -2,30 +2,18 @@ use repyh::server::Server;
 use repyh::simple_transaction::SimpleTransaction;
 use rouille::{router, Response};
 use std::sync::{Arc, Mutex};
+use repyh::block::Block;
+
+const ACCEPTED: &str = "Accepted";
+const REJECTED: &str = "Rejected";
 
 fn handle_web_server(server: Arc<Mutex<Server>>) {
     rouille::start_server("localhost:8000", move |request| {
         router!(request,
-            (GET) (/) => {
-                // If the request's URL is `/`, we jump here.
-                Response::redirect_302("/hello/world")
-            },
-
-            (GET) (/hello/world) => {
-                println!("hello world");
-                Response::text("hello world from server")
-            },
-
-            (GET) (/register_worker/{port: String}) => {
-                // Workers ask for a list of all the other workers
-                println!("Worker ask for registration: {port}");
-                Response::text("registered")
-            },
-            
             (GET) (/get_transaction) => {
-                // Workers ask for a list of all the other workers
+                // Worker ask for a random transaction in the list from the pending ones
                 println!("Worker ask for previous transaction !");
-                if let Some(transaction) = server.lock().unwrap().get_last_transaction() {
+                if let Some(transaction) = server.lock().unwrap().get_pending_transaction() {
                     let as_json = serde_json::to_string(&transaction).unwrap();
                     Response::text(as_json)
                 } else {
@@ -33,20 +21,24 @@ fn handle_web_server(server: Arc<Mutex<Server>>) {
                 }
             },
 
-            (GET) (/{id: u32}) => {
-                println!("u32 {:?}", id);
-                Response::empty_400()
-            },
+            (GET) (/submit_block/{data: String}) => {
+                // Parse the block sent by the client
+                let received: Block = serde_json::from_str(&data).unwrap();
 
-            (GET) (/{id: String}) => {
-                println!("String {:?}", id);
-                Response::text(format!("hello, {}", id))
+                // TODO This is not the consensus protocol
+                //      I have to change this, somehow.
+                // Try to append it to the server
+                if server.lock().unwrap().add_block_safe(received) {
+                    Response::text(ACCEPTED)
+                } else {
+                    Response::text(REJECTED)
+                }
             },
 
             _ => Response::empty_404()
         )
     });
-    
+
 }
 
 /// The server is in charge of
@@ -56,14 +48,13 @@ fn handle_web_server(server: Arc<Mutex<Server>>) {
 fn main() {
     let mut server = Server::new();
 
-    // Dummy fill of the server (for now)
-    // let mut client1 = Client::new(100);
-    // server.submit_transaction(client1.emit_transaction(client1.public_key(), 5).unwrap());
-    // server.submit_transaction(client1.emit_transaction(client1.public_key(), 5).unwrap());
-    
     server.submit_transaction(SimpleTransaction::from_str("Hello"));
     server.submit_transaction(SimpleTransaction::from_str("World"));
     server.submit_transaction(SimpleTransaction::from_str("from arthur"));
+    server.submit_transaction(SimpleTransaction::from_str("Again something else"));
+    server.submit_transaction(SimpleTransaction::from_str("I got a book on that day"));
+    server.submit_transaction(SimpleTransaction::from_str("Please, never forget that i said that one day"));
+    server.submit_transaction(SimpleTransaction::from_str("The answer is 42"));
 
     // Send a thread-safe pointer to the server to the webserver
     let server = Arc::new(Mutex::new(server));

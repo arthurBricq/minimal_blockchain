@@ -1,12 +1,14 @@
 use crate::simple_transaction::SimpleTransaction;
 use std::fmt::{Debug, Formatter};
 use serde::{Deserialize, Serialize};
+use sha256::digest;
 
 #[derive(Serialize, Deserialize)]
 pub struct Block {
     transactions: SimpleTransaction,
     previous_hash: Option<String>,
     nonce: u64,
+    index_in_chain: u64,
     /// Internal representation of the bytes of the transactions
     /// This avoids to recompute it every time that `bytes` is called
     #[serde(skip)]
@@ -14,22 +16,25 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn new(transactions: SimpleTransaction) -> Self {
+    pub fn genesis(transactions: SimpleTransaction) -> Self {
         let bytes: Vec<u8> = transactions.to_bytes();
         Self {
             transactions,
             immutable_bytes: bytes,
             nonce: 0,
+            index_in_chain: 0,
             previous_hash: None
         }
     }
 
-    pub fn new_from_hash(data: SimpleTransaction, previous_hash: String) -> Self {
-        let mut block = Self::new(data);
-        block.set_previous_hash(previous_hash);
+    /// Build a new block located after the given block.
+    pub fn new_after_block(data: SimpleTransaction, previous: &Block) -> Self {
+        let mut block = Self::genesis(data);
+        block.previous_hash = Some(previous.hash());
+        block.index_in_chain = previous.index_in_chain + 1;
         block
     }
-    
+
     pub fn set_nonce(&mut self, nonce: u64) {
         self.nonce = nonce;
     }
@@ -37,6 +42,17 @@ impl Block {
     pub fn set_previous_hash(&mut self, previous_hash: String) {
         self.previous_hash = Some(previous_hash);
     }
+
+    pub fn previous_hash(&self) -> Option<String> {
+        self.previous_hash.clone()
+    }
+
+    pub fn hash(&self) -> String {
+        let data = self.bytes();
+        digest(data)
+    }
+
+
 
     /// Returns a bytes representation of this block
     pub fn bytes(&self) -> Vec<u8> {
@@ -48,7 +64,9 @@ impl Block {
         bytes
     }
 
-
+    pub fn transactions(&self) -> &SimpleTransaction {
+        &self.transactions
+    }
 }
 
 impl Debug for Block {

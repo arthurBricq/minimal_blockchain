@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 /// A very simple transaction that can be shared on the network
 /// The goal of saving this transaction on the blockchain is to have its record written immutably across
 /// many computers.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[derive(Serialize, Deserialize)]
 pub struct SimpleTransaction {
     message: String,

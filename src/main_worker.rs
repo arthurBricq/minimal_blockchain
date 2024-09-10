@@ -1,12 +1,12 @@
-use std::error::Error;
-use reqwest::Client;
-use sha256::digest;
-use tokio::select;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::UnboundedSender;
 use repyh::block::Block;
 use repyh::simple_transaction::SimpleTransaction;
+use reqwest::Client;
+use std::error::Error;
+use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::UnboundedSender;
 use tokio_util::sync::CancellationToken;
+use repyh::blockchain::Blockchain;
 
 mod worker;
 mod p2p_network;
@@ -32,17 +32,14 @@ pub async fn mine(
 
     // We are looking for an output that starts with a certain number of zeros
     for nonce in 0..u64::MAX {
-        block.set_nonce(nonce);
-        let data = block.bytes();
-        let hash = digest(data);
-
         // look for a start with N zeros
+        block.set_nonce(nonce);
+        let hash = block.hash();
         if hash.starts_with(&start_pattern) {
             return Some(hash)
         }
-
+        // Always check if this thread was asked to be cancelled
         if cancellation_token.is_cancelled() {
-            // Abort
             return None
         }
     }
@@ -61,6 +58,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     
     // Leave some initial time so that the P2P network setup correctly
     tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
+    
+    let chain = Arc::new(Mutex::new(Blockchain::new()));
 
     let client = reqwest::Client::new();
     let token = CancellationToken::new();
@@ -105,7 +104,7 @@ async fn request_new_transaction_and_work(
             // Start to mine the block
             // We use a cancellation token to abort the task
             tokio::task::spawn(async move {
-                let mut new_block = Block::new(parsed);
+                let mut new_block = Block::genesis(parsed);
                 if let Some(hash) = mine(&mut new_block, 4, cancellation_token).await {
                     // Broadcast the mined bitcoin to the swarm
                     println!("Finished to mine ! : {hash}");
