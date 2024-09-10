@@ -23,7 +23,11 @@ async fn async_req(url: &str, client: reqwest::Client) -> Result<reqwest::Respon
 
 /// Find the nonce for which the bytes of the given block match a pattern
 /// starting with N zeros, where `N` is the `difficulty` argument.
-pub async fn mine(block: &mut Block, difficulty: usize, cancellation_token: CancellationToken) -> String {
+pub async fn mine(
+    block: &mut Block,
+    difficulty: usize,
+    cancellation_token: CancellationToken
+) -> Option<String> {
     let start_pattern = String::from_utf8(vec![b'0'; difficulty]).unwrap();
 
     // We are looking for an output that starts with a certain number of zeros
@@ -34,24 +38,16 @@ pub async fn mine(block: &mut Block, difficulty: usize, cancellation_token: Canc
 
         // look for a start with N zeros
         if hash.starts_with(&start_pattern) {
-            return hash
+            return Some(hash)
         }
 
         if cancellation_token.is_cancelled() {
             // Abort
-            panic!("to abort...")
+            return None
         }
     }
 
-    panic!("")
-}
-
-async fn mine_something(cancellation_token: CancellationToken) -> String {
-    // Mining a block here.
-    let tx1 = SimpleTransaction::from_str("Victor bought a car from Arthur");
-    let mut genesis = Block::new(tx1);
-    println!("Starting to mine");
-    mine(&mut genesis, 6, cancellation_token).await
+    None
 }
 
 #[tokio::main]
@@ -62,6 +58,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Create a thread that listens to the P2P network
     // This allows us to know if another node found a node, and if so, to check it...
     p2p_network::join_p2p_network(rx_local_block, tx_network_blocks).expect("TODO: panic message");
+    
+    // Leave some initial time so that the P2P network setup correctly
     tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
 
     let client = reqwest::Client::new();
@@ -70,20 +68,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let new_client = client.clone();
     let tx = tx_local_block.clone();
-    work(tx, new_client, cloned_token).await;
+    request_new_transaction_and_work(tx, new_client, cloned_token).await;
         
     loop {
         if let Some(msg) = rx_network_blocks.recv().await {
+            // Extract the new block
+            let block: Block = serde_json::from_str(&msg).unwrap();
             println!("RECEIVED A BLOCK FOR CANCELLATION");
+            println!("{block:?}");
             token.cancel();
         }
-
-        // tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        // println!("...")
     }
 }
 
-async fn work(
+async fn request_new_transaction_and_work(
     tx_local_block: UnboundedSender<String>,
     client: Client,
     cancellation_token: CancellationToken
@@ -108,13 +106,13 @@ async fn work(
             // We use a cancellation token to abort the task
             tokio::task::spawn(async move {
                 let mut new_block = Block::new(parsed);
-                let hash = mine(&mut new_block, 4, cancellation_token).await;
-                println!("Finished to mine ! : {hash}");
-
-                // Broadcast the mined bitcoin to the swarm
-                tx_local_block
-                    .send(serde_json::to_string(&new_block).unwrap())
-                    .expect("Broadcasting mined block did not work.");
+                if let Some(hash) = mine(&mut new_block, 4, cancellation_token).await {
+                    // Broadcast the mined bitcoin to the swarm
+                    println!("Finished to mine ! : {hash}");
+                    tx_local_block
+                        .send(serde_json::to_string(&new_block).unwrap())
+                        .expect("Broadcasting mined block did not work.");
+                }
             });
         }
         _ => {}
