@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 use rouille::{router, Response};
 use repyh::client::Client;
 use repyh::server::Server;
+use repyh::simple_transaction::SimpleTransaction;
 
 fn handle_web_server(server: Arc<Mutex<Server>>) {
     rouille::start_server("localhost:8000", move |request| {
@@ -54,9 +55,13 @@ fn main() {
     let mut server = Server::new();
 
     // Dummy fill of the server (for now)
-    let mut client1 = Client::new(100);
-    server.submit_transaction(client1.emit_transaction(client1.public_key(), 5).unwrap());
-    server.submit_transaction(client1.emit_transaction(client1.public_key(), 5).unwrap());
+    // let mut client1 = Client::new(100);
+    // server.submit_transaction(client1.emit_transaction(client1.public_key(), 5).unwrap());
+    // server.submit_transaction(client1.emit_transaction(client1.public_key(), 5).unwrap());
+    
+    server.submit_transaction(SimpleTransaction::from_str("Hello"));
+    server.submit_transaction(SimpleTransaction::from_str("World"));
+    server.submit_transaction(SimpleTransaction::from_str("from arthur"));
 
     // Send a thread-safe pointer to the server to the webserver
     let server = Arc::new(Mutex::new(server));

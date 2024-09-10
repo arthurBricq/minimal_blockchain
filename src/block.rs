@@ -1,8 +1,8 @@
+use crate::simple_transaction::SimpleTransaction;
 use std::fmt::{Debug, Formatter};
-use crate::transaction::Transaction;
 
 pub struct Block {
-    transactions: Vec<Transaction>,
+    transactions: Vec<SimpleTransaction>,
     previous_hash: Option<String>,
     nonce: u64,
     /// Internal representation of the bytes of the transactions
@@ -11,26 +11,24 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn new(data: Vec<Transaction>) -> Self {
-        let mut bytes: Vec<u8> = data
+    pub fn new(transactions: Vec<SimpleTransaction>) -> Self {
+        let bytes: Vec<u8> = transactions
             .iter()
             .flat_map(|tx| tx.to_bytes())
             .collect();
         Self {
-            transactions: data,
+            transactions,
             immutable_bytes: bytes,
             nonce: 0,
             previous_hash: None
         }
     }
 
-    pub fn new_from_hash(data: Vec<Transaction>, previous_hash: String) -> Self {
+    pub fn new_from_hash(data: Vec<SimpleTransaction>, previous_hash: String) -> Self {
         let mut block = Self::new(data);
         block.set_previous_hash(previous_hash);
         block
     }
-
-
 
     /// Returns a bytes representation of this block
     pub fn bytes(&self) -> Vec<u8> {

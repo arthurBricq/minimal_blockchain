@@ -1,34 +1,31 @@
-use crate::client::Client;
-use crate::transaction::Transaction;
+use crate::simple_transaction::SimpleTransaction;
 use std::collections::VecDeque;
 
 pub struct Server {
-    /// All the registered clients in the network
-    // clients: Vec<Client>,
-    /// addresses of the workers
-    workers: Vec<String>,
     /// Pool of pending transactions
-    pool: VecDeque<Transaction>
+    pool: VecDeque<SimpleTransaction>
 }
 
 impl Server {
     pub fn new() -> Self {
         Self {
-            // clients: vec![],
-            workers: vec![],
             pool: VecDeque::new(),
         }
     }
 
-    pub fn submit_transaction(&mut self, tx: Transaction) {
+    pub fn submit_transaction(&mut self, tx: SimpleTransaction) {
         self.pool.push_back(tx)
     }
-
-    pub fn workers(&self) -> &Vec<String> {
-        &self.workers
+    
+    pub fn get_last_transaction(&self, n: u32) -> Vec<SimpleTransaction> {
+        let mut result = Vec::new();
+        let size = self.pool.len();
+        for i in 0..n {
+            if i >= 0 {
+                result.push(self.pool[size - 1 - i].clone());
+            }
+        }
+        result
     }
 
-    pub fn register_worker(&mut self, worker: String) {
-        self.workers.push(worker);
-    }
 }

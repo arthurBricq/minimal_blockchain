@@ -1,10 +1,12 @@
 use repyh::block::Block;
 use repyh::client::Client;
 use repyh::mining;
+use repyh::simple_transaction::SimpleTransaction;
 
 fn main() {
     const DIFFICULTY: usize = 3;
-
+    
+    /*
     // Create three clients
     let mut client1 = Client::new(100);
     let mut client2 = Client::new(100);
@@ -12,6 +14,10 @@ fn main() {
 
     let tx1 = client1.emit_transaction(client2.public_key(), 10).unwrap();
     let tx2 = client2.emit_transaction(client1.public_key(), 10).unwrap();
+     */
+    
+    let tx1 = SimpleTransaction::from_str("Victor bought a car from Arthur");
+    let tx2 = SimpleTransaction::from_str("Arthur bought a book from Arnaud");
 
     // Mine the first block
     let mut genesis = Block::new(vec![tx1]);
