@@ -13,6 +13,10 @@ path = "src/main_client.rs"
 name = "server"
 path = "src/main_server.rs"
 
+[[bin]]
+name = "node"
+path = "src/main_worker.rs"
+
 [dependencies]
 # Use to hash blocks
 sha256 = "1.5.0"
