@@ -20,20 +20,16 @@ fn main() {
     let tx1 = client1.emit_transaction(client2.public_key(), 10).unwrap();
     let tx2 = client2.emit_transaction(client1.public_key(), 10).unwrap();
 
+    // Mine the first block
     let mut genesis = Block::new(vec![tx1]);
     let hash= mining::mine(&mut genesis, DIFFICULTY);
     println!("result =  {hash}");
     println!("block  =  {genesis:?}");
 
-    // block is mined now...
-    let mut next = Block::new(vec![tx2]);
-    next.set_previous_hash(hash);
+    // Mine the second block
+    let mut next = Block::new_from_hash(vec![tx2], hash);
     let hash = mining::mine(&mut next, DIFFICULTY);
-    println!("result =  {hash}");
+    println!("\nresult =  {hash}");
     println!("block  =  {next:?}");
 
-    /*
-     */
-
-    println!("Hello, world!");
 }

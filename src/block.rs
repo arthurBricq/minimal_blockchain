@@ -7,7 +7,7 @@ pub struct Block {
     nonce: u64,
     /// Internal representation of the bytes of the transactions
     /// This avoids to recompute it every time that `bytes` is called
-    transaction_bytes: Vec<u8>
+    immutable_bytes: Vec<u8>
 }
 
 impl Block {
@@ -18,15 +18,23 @@ impl Block {
             .collect();
         Self {
             transactions: data,
-            transaction_bytes: bytes,
+            immutable_bytes: bytes,
             nonce: 0,
             previous_hash: None
         }
     }
 
+    pub fn new_from_hash(data: Vec<Transaction>, previous_hash: String) -> Self {
+        let mut block = Self::new(data);
+        block.set_previous_hash(previous_hash);
+        block
+    }
+
+
+
     /// Returns a bytes representation of this block
     pub fn bytes(&self) -> Vec<u8> {
-        let mut bytes = self.transaction_bytes.clone();
+        let mut bytes = self.immutable_bytes.clone();
         bytes.extend_from_slice(&self.nonce.to_le_bytes());
         if let Some(hash) = &self.previous_hash {
             bytes.extend_from_slice(hash.as_bytes());
