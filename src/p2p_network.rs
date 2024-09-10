@@ -7,6 +7,7 @@ use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::{io, io::AsyncBufReadExt, select};
+use tokio::task::JoinHandle;
 use tracing_subscriber::EnvFilter;
 
 // We create a custom network behaviour that combines Gossipsub and Mdns.
@@ -16,7 +17,7 @@ struct P2PBlockSharingBehavior {
     mdns: mdns::tokio::Behaviour,
 }
 
-pub fn join_p2p_network() -> Result<(), Box<dyn Error>> {
+pub fn join_p2p_network() -> Result<JoinHandle<()>, Box<dyn Error>> {
     let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .try_init();
@@ -30,22 +31,25 @@ pub fn join_p2p_network() -> Result<(), Box<dyn Error>> {
     // Listen on all interfaces and whatever port the OS assigns
     swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
     swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
-    
+
     // Spawn a new thread of this the P2P network
-    std::thread::spawn(|| handle_swarm(swarm, topic));
     
-    Ok(())
+    let future = tokio::spawn(async move {
+        handle_swarm(swarm, topic).await;
+    });
+
+    Ok((future))
 }
 
-pub async fn handle_swarm(
-    mut swarm: Swarm<P2PBlockSharingBehavior>,
-    topic: gossipsub::IdentTopic,
-) {
+async fn handle_swarm(mut swarm: Swarm<P2PBlockSharingBehavior>, topic: gossipsub::IdentTopic, ) {
+    println!("Joining swarm ...");
+    
     // Read full lines from stdin
     let mut stdin = io::BufReader::new(io::stdin()).lines();
 
     // Kick it off
     loop {
+        tokio::time::sleep(Duration::from_secs(1)).await;
         select! {
             Ok(Some(line)) = stdin.next_line() => {
                 if let Err(e) = swarm
@@ -82,11 +86,11 @@ pub async fn handle_swarm(
             }
         }
     }
-    
+
 }
 
 fn build_libp2p_swarm() -> Result<Swarm<P2PBlockSharingBehavior>, Box<dyn Error>> {
-    let mut swarm = libp2p::SwarmBuilder::with_new_identity()
+    let swarm = libp2p::SwarmBuilder::with_new_identity()
         .with_tokio()
         .with_tcp(
             tcp::Config::default(),

@@ -24,12 +24,10 @@ fn handle_web_server(server: Arc<Mutex<Server>>) {
                 Response::text("registered")
             },
             
-            (GET) (/submit_block/{port: String}) => {
+            (GET) (/get_transactions/{last: u32}) => {
                 // Workers ask for a list of all the other workers
-                println!("Worker ask for registration: {port}");
-                server.lock().unwrap().register_worker(port);
-                println!("Current workers: {:?}", server.lock().unwrap().workers());
-                Response::text("registered")
+                println!("Worker ask for previous {last} transactions !");
+                Response::text("TODO")
             },
 
             (GET) (/{id: u32}) => {
