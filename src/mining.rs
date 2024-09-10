@@ -1,4 +1,4 @@
-use crate::blockchain::Block;
+use crate::block::Block;
 use sha256::digest;
 
 pub fn mine(block: &mut Block) -> String {

@@ -1,17 +1,14 @@
-pub struct BlockChain {
-    genesis: Block
-}
-
+use crate::transaction::Transaction;
 
 #[derive(Debug)]
 pub struct Block {
-    data: u64,
+    data: Vec<Transaction>,
+    previous_hash: Option<String>,
     nonce: u64,
-    previous_hash: Option<String>
 }
 
 impl Block {
-    pub fn new(data: u64) -> Self {
+    pub fn new(data: Vec<Transaction>) -> Self {
         Self {
             data,
             nonce: 0,
@@ -20,6 +17,8 @@ impl Block {
     }
 
     pub fn bytes(&self) ->Vec<u8> {
+        let tmp = self.data.iter().flat_map(|tx| tx.to_bytes()).collect();
+
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&self.data.to_le_bytes());
         bytes.extend_from_slice(&self.nonce.to_le_bytes());
@@ -37,11 +36,3 @@ impl Block {
         self.previous_hash = Some(previous_hash);
     }
 }
-
-impl BlockChain {
-    pub fn new(genesis: Block) -> Self {
-        Self { genesis }
-    }
-
-}
-

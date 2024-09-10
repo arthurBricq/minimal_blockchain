@@ -1,6 +1,6 @@
-use crate::blockchain::{Block, BlockChain};
+use crate::block::{Block, BlockChain};
 
-mod blockchain;
+mod block;
 mod mining;
 mod client;
 mod pool;
