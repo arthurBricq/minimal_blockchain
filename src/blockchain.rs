@@ -15,6 +15,10 @@ impl Blockchain {
             chain: vec![genesis]
         }
     }
+    
+    pub fn add_block_unsafe(&mut self, block: Block) {
+        self.chain.push(block);
+    }
 
     pub fn add_block_safe(&mut self, block: Block) -> bool {
         if block.previous_hash().unwrap() == self.chain.last().unwrap().hash() {
@@ -27,6 +31,10 @@ impl Blockchain {
     
     pub fn last_transaction(&self) -> &SimpleTransaction {
         self.chain.last().unwrap().transactions()
+    }
+    
+    pub fn get_candidate_block(&self, transaction: SimpleTransaction) -> Block {
+        Block::new_after_block(transaction, self.chain.last().unwrap())
     }
     
 }
