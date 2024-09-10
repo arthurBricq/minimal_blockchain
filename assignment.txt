@@ -1,0 +1,23 @@
+As a reminder, the homework challenge will build up on the code you wrote during the first live technical interview.
+
+Rules:
+
+    You should spend at least 1 and at most 2 full days on it. We won’t be really strict about this; you can tell us on submission how long you spent and we will judge accordingly.
+    You can submit your solution by email as a reply to this one. You can choose to put your code on a public GitHub repository but it’s not necessary.
+    You can use any tools and libraries you want.
+
+The homework:
+
+Create a simulation of a PoW blockchain with multiple nodes. Each node should be able to:
+
+    Receive transactions via API (for easy simulation) and add them to a pool of pending transactions (mempool).
+    Broadcast transactions to the rest of the network nodes.
+    Assemble them into blocks and mine these blocks, adding them to the local blockchain.
+    Once a block is mined, it should be broadcast to the other nodes.
+    Validate blocks received from other nodes and add them to the local copy of the blockchain.
+
+Note 1: For the network interactions, you have the option to either mock the network environment or implement a more realistic networking solution.
+
+Note 2: Running this simulation would also require a simple client (wallet) to send transactions to the nodes.
+
+Note 3: A lot of details have been omitted on purpose. We expect you to decide how to fill the gaps.
