@@ -20,13 +20,13 @@ fn main() {
     let tx2 = SimpleTransaction::from_str("Arthur bought a book from Arnaud");
 
     // Mine the first block
-    let mut genesis = Block::new(vec![tx1]);
+    let mut genesis = Block::new(tx1);
     let hash = mining::mine(&mut genesis, DIFFICULTY);
     println!("result =  {hash}");
     println!("block  =  {genesis:?}");
 
     // Mine the second block
-    let mut next = Block::new_from_hash(vec![tx2], hash);
+    let mut next = Block::new_from_hash(tx2, hash);
     let hash = mining::mine(&mut next, DIFFICULTY);
     println!("\nresult =  {hash}");
     println!("block  =  {next:?}");

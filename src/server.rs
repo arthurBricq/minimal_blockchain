@@ -17,15 +17,12 @@ impl Server {
         self.pool.push_back(tx)
     }
     
-    pub fn get_last_transaction(&self, n: u32) -> Vec<SimpleTransaction> {
-        let mut result = Vec::new();
-        let size = self.pool.len();
-        for i in 0..n {
-            if i >= 0 {
-                result.push(self.pool[size - 1 - i].clone());
-            }
+    pub fn get_last_transaction(&self) -> Option<SimpleTransaction> {
+        if self.pool.is_empty() {
+            None
+        } else {
+            Some(self.pool[self.pool.len() - 1].clone())
         }
-        result
     }
 
 }

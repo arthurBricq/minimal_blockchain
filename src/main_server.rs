@@ -1,8 +1,7 @@
-use std::sync::{Arc, Mutex};
-use rouille::{router, Response};
-use repyh::client::Client;
 use repyh::server::Server;
 use repyh::simple_transaction::SimpleTransaction;
+use rouille::{router, Response};
+use std::sync::{Arc, Mutex};
 
 fn handle_web_server(server: Arc<Mutex<Server>>) {
     rouille::start_server("localhost:8000", move |request| {
@@ -20,15 +19,18 @@ fn handle_web_server(server: Arc<Mutex<Server>>) {
             (GET) (/register_worker/{port: String}) => {
                 // Workers ask for a list of all the other workers
                 println!("Worker ask for registration: {port}");
-                server.lock().unwrap().register_worker(port);
-                println!("Current workers: {:?}", server.lock().unwrap().workers());
                 Response::text("registered")
             },
             
-            (GET) (/get_transactions/{last: u32}) => {
+            (GET) (/get_transaction) => {
                 // Workers ask for a list of all the other workers
-                println!("Worker ask for previous {last} transactions !");
-                Response::text("TODO")
+                println!("Worker ask for previous transaction !");
+                if let Some(transaction) = server.lock().unwrap().get_last_transaction() {
+                    let as_json = serde_json::to_string(&transaction).unwrap();
+                    Response::text(as_json)
+                } else {
+                    Response::text("")
+                }
             },
 
             (GET) (/{id: u32}) => {
