@@ -1,0 +1,13 @@
+Hello Antonis,
+
+Thanks for these instructions. Very challenging homework ! Since you offered, I have a question regarding the "decentralized" aspect of the system.
+
+So far, I have improved the mining process so that blocks contain information about transactions.
+
+Then, I started to work on having multiple "workers" working in parallel. The big challenge is to communicate to other workers that they have finished to solve the problem once that one do finish.
+
+At first I started implementing a web-server that could broadcast to other nodes this information, but then quickly realized that this was absolutely not decentralized. So I spent some time reading the doc of `libp2p.rs` and managed to setup a basic text communication between several workers.
+
+My question is regarding the pending transactions. I don't understand how to have this information decentralized easily. I am assuming it should not be the responsibility of the workers to also register pending transactions.
+
+Therefore, I wonder if it is fine if there is a standard "web-server" which provides to all workers a buffer of the last pending transactions ? In the sense, if I implement this for my solution, is it considered a good alternative ?
