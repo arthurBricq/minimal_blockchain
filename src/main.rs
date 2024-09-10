@@ -2,9 +2,12 @@ use crate::blockchain::{Block, BlockChain};
 
 mod blockchain;
 mod mining;
+mod client;
+mod pool;
+mod server;
+mod transaction;
 
 fn main() {
-    println!("Hello, world!");
 
     let mut gen = Block::new(145);
     let hash= mining::mine(&mut gen);
@@ -17,6 +20,7 @@ fn main() {
     let hash = mining::mine(&mut next);
     println!("result =  {hash}");
     println!("block  =  {next:?}");
+
 
 
 }
