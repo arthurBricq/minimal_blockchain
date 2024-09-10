@@ -16,13 +16,12 @@ impl Server {
     pub fn submit_transaction(&mut self, tx: SimpleTransaction) {
         self.pool.push_back(tx)
     }
-    
+
     pub fn get_last_transaction(&self) -> Option<SimpleTransaction> {
         if self.pool.is_empty() {
             None
         } else {
-            Some(self.pool[self.pool.len() - 1].clone())
+            Some(self.pool[0].clone())
         }
     }
-
 }

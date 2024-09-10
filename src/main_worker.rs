@@ -1,4 +1,5 @@
 use std::error::Error;
+use repyh::simple_transaction::SimpleTransaction;
 
 mod worker;
 mod p2p_network;
@@ -25,10 +26,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
     loop {
         // Make a request to the server
         let new_client = client.clone();
-        tokio::spawn(async move {
-            let response = async_req("http://localhost:8000/register_worker/11", new_client).await;
+        let response = tokio::spawn(async move {
+            if let Ok(response) = async_req("http://localhost:8000/get_transaction", new_client).await {
+                Some(response)
+            } else {
+                None
+            }
         });
-        
+
+        match response.await {
+            Ok(Some(res)) => {
+                let as_text = res.text().await?;
+                let parsed: SimpleTransaction = serde_json::from_str(&as_text).unwrap();
+                println!("received: {:?}", parsed);
+            }
+            _ => {}
+        }
+
+
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     }
 }

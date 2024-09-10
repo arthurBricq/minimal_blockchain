@@ -7,27 +7,27 @@ use std::str::from_utf8;
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
 pub struct SimpleTransaction {
-    data: Vec<u8>,
+    message: String,
 }
 
 impl SimpleTransaction {
     pub fn new() -> Self {
         Self {
-            data: Default::default(),
+            message: Default::default(),
         }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
-        self.data.clone()
+        self.message.as_bytes().to_vec()
     }
 
     pub fn from_str(text: &str) -> Self {
         Self {
-            data: text.as_bytes().to_vec(),
+            message: text.to_string(),
         }
     }
 
     pub fn to_string(&self) -> String {
-        from_utf8(&self.data).unwrap().to_string()
+        self.message.clone()
     }
 }
