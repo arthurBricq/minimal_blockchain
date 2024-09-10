@@ -1,7 +1,9 @@
 use std::error::Error;
+use reqwest::Client;
 use sha256::digest;
 use tokio::select;
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::UnboundedSender;
 use repyh::block::Block;
 use repyh::simple_transaction::SimpleTransaction;
 use tokio_util::sync::CancellationToken;
@@ -54,20 +56,41 @@ async fn mine_something(cancellation_token: CancellationToken) -> String {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let (tx, rx) = mpsc::unbounded_channel();
-
-    // Start mining on another task
+    let (tx_local_block, rx_local_block) = mpsc::unbounded_channel();
+    let (tx_network_blocks, mut rx_network_blocks) = mpsc::unbounded_channel();
 
     // Create a thread that listens to the P2P network
     // This allows us to know if another node found a node, and if so, to check it...
-    p2p_network::join_p2p_network().expect("TODO: panic message");
+    p2p_network::join_p2p_network(rx_local_block, tx_network_blocks).expect("TODO: panic message");
+    tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
 
     let client = reqwest::Client::new();
+    let token = CancellationToken::new();
+    let cloned_token = token.clone();
 
-    // Ask the server for pending transaction
     let new_client = client.clone();
+    let tx = tx_local_block.clone();
+    work(tx, new_client, cloned_token).await;
+        
+    loop {
+        if let Some(msg) = rx_network_blocks.recv().await {
+            println!("RECEIVED A BLOCK FOR CANCELLATION");
+            token.cancel();
+        }
+
+        // tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        // println!("...")
+    }
+}
+
+async fn work(
+    tx_local_block: UnboundedSender<String>,
+    client: Client,
+    cancellation_token: CancellationToken
+) -> Result<(), Box<dyn Error>> {
+    // Ask the server for pending transaction
     let response = tokio::spawn(async move {
-        if let Ok(response) = async_req("http://localhost:8000/get_transaction", new_client).await {
+        if let Ok(response) = async_req("http://localhost:8000/get_transaction", client).await {
             Some(response)
         } else {
             None
@@ -83,25 +106,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             // Start to mine the block
             // We use a cancellation token to abort the task
-            let token = CancellationToken::new();
-            let cloned_token = token.clone();
             tokio::task::spawn(async move {
                 let mut new_block = Block::new(parsed);
-                let hash = mine(&mut new_block, 5, cloned_token).await;
+                let hash = mine(&mut new_block, 4, cancellation_token).await;
                 println!("Finished to mine ! : {hash}");
-                
-                // Broadcast the mined bitcoin to the swarm
-                tx.send(serde_json::to_string(&new_block).unwrap()).expect("Broadcasting mined block did not work.");
-            });
-            
 
+                // Broadcast the mined bitcoin to the swarm
+                tx_local_block
+                    .send(serde_json::to_string(&new_block).unwrap())
+                    .expect("Broadcasting mined block did not work.");
+            });
         }
         _ => {}
     }
-
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-        println!("Hello...")
-    }
+    
     Ok(())
 }

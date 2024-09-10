@@ -7,6 +7,7 @@ use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::{io, io::AsyncBufReadExt, select};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
 use tracing_subscriber::EnvFilter;
 
@@ -17,7 +18,10 @@ struct P2PBlockSharingBehavior {
     mdns: mdns::tokio::Behaviour,
 }
 
-pub fn join_p2p_network() -> Result<JoinHandle<()>, Box<dyn Error>> {
+pub fn join_p2p_network(
+    rx_local_blocks: UnboundedReceiver<String>,
+    tx_network_blocks: UnboundedSender<String>
+) -> Result<JoinHandle<()>, Box<dyn Error>> {
     let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .try_init();
@@ -33,17 +37,21 @@ pub fn join_p2p_network() -> Result<JoinHandle<()>, Box<dyn Error>> {
     swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
 
     // Spawn a new thread of this the P2P network
-    
     let future = tokio::spawn(async move {
-        handle_swarm(swarm, topic).await;
+        handle_swarm(swarm, topic, rx_local_blocks, tx_network_blocks).await;
     });
 
     Ok((future))
 }
 
-async fn handle_swarm(mut swarm: Swarm<P2PBlockSharingBehavior>, topic: gossipsub::IdentTopic, ) {
+async fn handle_swarm(
+    mut swarm: Swarm<P2PBlockSharingBehavior>,
+    topic: gossipsub::IdentTopic,
+    mut rx_local_blocks: UnboundedReceiver<String>,
+    mut tx_network_blocks: UnboundedSender<String>
+) {
     println!("Joining swarm ...");
-    
+
     // Read full lines from stdin
     let mut stdin = io::BufReader::new(io::stdin()).lines();
 
@@ -55,6 +63,13 @@ async fn handle_swarm(mut swarm: Swarm<P2PBlockSharingBehavior>, topic: gossipsu
                 if let Err(e) = swarm
                     .behaviour_mut().gossipsub
                     .publish(topic.clone(), line.as_bytes()) {
+                    println!("Publish error: {e:?}");
+                }
+            }
+            Some(msg) = rx_local_blocks.recv() => {
+                if let Err(e) = swarm
+                    .behaviour_mut().gossipsub
+                    .publish(topic.clone(), msg.as_bytes()) {
                     println!("Publish error: {e:?}");
                 }
             }
@@ -74,11 +89,12 @@ async fn handle_swarm(mut swarm: Swarm<P2PBlockSharingBehavior>, topic: gossipsu
                 SwarmEvent::Behaviour(P2PBlockSharingBehaviorEvent::Gossipsub(gossipsub::Event::Message {
                     propagation_source: peer_id,
                     message_id: id,
-                    message,
-                })) => println!(
-                        "Got message: '{}' with id: {id} from peer: {peer_id}",
-                        String::from_utf8_lossy(&message.data),
-                    ),
+                    message})) => {
+                    let msg = String::from_utf8_lossy(&message.data).to_string();
+                    println!("Got message: '{msg}' with id: {id} from peer: {peer_id}");
+                    // Communicate to the working thread that another node is proposing a node...
+                    tx_network_blocks.send(msg).unwrap();
+                }
                 SwarmEvent::NewListenAddr { address, .. } => {
                     println!("Local node is listening on {address}");
                 }
