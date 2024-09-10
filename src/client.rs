@@ -1,11 +1,11 @@
-use std::fmt::{Display, Formatter};
+use crate::transaction::Transaction;
 use rand::prelude::ThreadRng;
-use rsa::{Oaep, Pkcs1v15Encrypt, Pkcs1v15Sign, Pss, RsaPrivateKey, RsaPublicKey};
 use rsa::pkcs1v15::SigningKey;
 use rsa::sha2::Sha256;
-use rsa::signature::{RandomizedSigner, Signer};
+use rsa::signature::RandomizedSigner;
 use rsa::traits::PublicKeyParts;
-use crate::transaction::Transaction;
+use rsa::{RsaPrivateKey, RsaPublicKey};
+use std::fmt::{Display, Formatter};
 
 /// Returns the bytes representation of a public key
 pub fn public_key_to_bytes<K: PublicKeyParts>(key: &K) -> Vec<u8> {

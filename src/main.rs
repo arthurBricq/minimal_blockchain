@@ -1,13 +1,6 @@
-use crate::block::Block;
-use crate::client::Client;
-use crate::transaction::Transaction;
-
-mod block;
-mod mining;
-mod client;
-mod pool;
-mod server;
-mod transaction;
+use repyh::block::Block;
+use repyh::client::Client;
+use repyh::mining;
 
 fn main() {
     const DIFFICULTY: usize = 3;
@@ -22,7 +15,7 @@ fn main() {
 
     // Mine the first block
     let mut genesis = Block::new(vec![tx1]);
-    let hash= mining::mine(&mut genesis, DIFFICULTY);
+    let hash = mining::mine(&mut genesis, DIFFICULTY);
     println!("result =  {hash}");
     println!("block  =  {genesis:?}");
 
