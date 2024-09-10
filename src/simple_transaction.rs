@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::str::from_utf8;
 
 /// A very simple transaction that can be shared on the network
 /// The goal of saving this transaction on the blockchain is to have its record written immutably across

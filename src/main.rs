@@ -4,7 +4,7 @@ use repyh::mining;
 use repyh::simple_transaction::SimpleTransaction;
 
 fn main() {
-    const DIFFICULTY: usize = 3;
+    const DIFFICULTY: usize = 5;
     
     /*
     // Create three clients

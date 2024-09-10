@@ -1,12 +1,15 @@
 use crate::simple_transaction::SimpleTransaction;
 use std::fmt::{Debug, Formatter};
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 pub struct Block {
     transactions: SimpleTransaction,
     previous_hash: Option<String>,
     nonce: u64,
     /// Internal representation of the bytes of the transactions
     /// This avoids to recompute it every time that `bytes` is called
+    #[serde(skip)]
     immutable_bytes: Vec<u8>
 }
 
@@ -26,6 +29,14 @@ impl Block {
         block.set_previous_hash(previous_hash);
         block
     }
+    
+    pub fn set_nonce(&mut self, nonce: u64) {
+        self.nonce = nonce;
+    }
+
+    pub fn set_previous_hash(&mut self, previous_hash: String) {
+        self.previous_hash = Some(previous_hash);
+    }
 
     /// Returns a bytes representation of this block
     pub fn bytes(&self) -> Vec<u8> {
@@ -37,13 +48,7 @@ impl Block {
         bytes
     }
 
-    pub fn set_nonce(&mut self, nonce: u64) {
-        self.nonce = nonce;
-    }
 
-    pub fn set_previous_hash(&mut self, previous_hash: String) {
-        self.previous_hash = Some(previous_hash);
-    }
 }
 
 impl Debug for Block {

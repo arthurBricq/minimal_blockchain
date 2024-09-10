@@ -52,6 +52,7 @@ futures = {}
 libp2p = { features = [ "tokio", "gossipsub", "mdns", "noise", "macros", "tcp", "yamux", "quic"] }
 tracing = {}
 tracing-subscriber = {features = ["env-filter"] }
+tokio-util = "0.7.12"
 
 # Serialize messages
 serde = { version = "1.0", features = ["derive"] }
