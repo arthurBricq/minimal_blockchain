@@ -1,4 +1,4 @@
-use crate::block::{Block, BlockChain};
+use crate::block::Block;
 
 mod block;
 mod mining;
@@ -9,6 +9,7 @@ mod transaction;
 
 fn main() {
 
+    /*
     let mut gen = Block::new(145);
     let hash= mining::mine(&mut gen);
     println!("result =  {hash}");
@@ -20,6 +21,9 @@ fn main() {
     let hash = mining::mine(&mut next);
     println!("result =  {hash}");
     println!("block  =  {next:?}");
+     */
+
+    println!("Hello, world!");
 
 
 

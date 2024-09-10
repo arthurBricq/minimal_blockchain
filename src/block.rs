@@ -2,7 +2,7 @@ use crate::transaction::Transaction;
 
 #[derive(Debug)]
 pub struct Block {
-    data: Vec<Transaction>,
+    transactions: Vec<Transaction>,
     previous_hash: Option<String>,
     nonce: u64,
 }
@@ -10,17 +10,18 @@ pub struct Block {
 impl Block {
     pub fn new(data: Vec<Transaction>) -> Self {
         Self {
-            data,
+            transactions: data,
             nonce: 0,
             previous_hash: None
         }
     }
 
+    /// Returns a bytes representation of this block
     pub fn bytes(&self) ->Vec<u8> {
-        let tmp = self.data.iter().flat_map(|tx| tx.to_bytes()).collect();
-
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(&self.data.to_le_bytes());
+        let mut bytes: Vec<u8> = self.transactions
+            .iter()
+            .flat_map(|tx| tx.to_bytes())
+            .collect();
         bytes.extend_from_slice(&self.nonce.to_le_bytes());
         if let Some(hash) = &self.previous_hash {
             bytes.extend_from_slice(hash.as_bytes());
