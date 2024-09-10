@@ -7,3 +7,12 @@ pub struct Server {
     /// Pool of pending transactions
     pool: MemPool
 }
+
+impl Server {
+    pub fn new() -> Self {
+        Self {
+            clients: vec![],
+            pool: MemPool::new(),
+        }
+    }
+}
