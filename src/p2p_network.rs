@@ -67,6 +67,7 @@ async fn handle_swarm(
                 }
             }
             Some(msg) = rx_local_blocks.recv() => {
+                println!("   (about to broadcast)  ");
                 if let Err(e) = swarm
                     .behaviour_mut().gossipsub
                     .publish(topic.clone(), msg.as_bytes()) {
@@ -91,7 +92,7 @@ async fn handle_swarm(
                     message_id: id,
                     message})) => {
                     let msg = String::from_utf8_lossy(&message.data).to_string();
-                    println!("Got message: '{msg}' with id: {id} from peer: {peer_id}");
+                    // println!("Got message: '{msg}' with id: {id} from peer: {peer_id}");
                     // Communicate to the working thread that another node is proposing a node...
                     tx_network_blocks.send(msg).unwrap();
                 }

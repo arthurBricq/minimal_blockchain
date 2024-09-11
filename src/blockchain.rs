@@ -2,7 +2,9 @@ use crate::block::Block;
 use crate::simple_transaction::SimpleTransaction;
 
 pub struct Blockchain {
-    chain: Vec<Block>
+    chain: Vec<Block>,
+    /// A hypothesis starts from an index 'n' and contains a chain of blocks.
+    hypothesis: Vec<(usize, Vec<Block>)>
 }
 
 impl Blockchain {
@@ -12,7 +14,8 @@ impl Blockchain {
         // This nonce was generated for a difficulty of 5 zeros
         genesis.set_nonce(1293653);
         Self {
-            chain: vec![genesis]
+            chain: vec![genesis],
+            hypothesis: vec![]
         }
     }
     
@@ -20,11 +23,14 @@ impl Blockchain {
         self.chain.push(block);
     }
 
+    /// Returns true if the main chain was updated.
     pub fn add_block_safe(&mut self, block: Block) -> bool {
         if block.previous_hash().unwrap() == self.chain.last().unwrap().hash() {
             self.chain.push(block);
             true
         } else {
+            // Try to place the cube in a new hypothesis
+            
             false
         }
     }
@@ -40,6 +46,26 @@ impl Blockchain {
     
     pub fn len(&self) -> usize {
         self.chain.len()
+    }
+    
+    pub fn print_chain(&self) {
+        self.chain.iter().for_each(|b| println!("     ^ {:} --> {:?}", b.hash(), b.transactions()))
+    }
+    
+    /// In the case that 
+    pub fn store_hypothesis(&mut self, block: Block) {
+        let mut i = 1;
+        let n = self.chain.len();
+        loop {
+            if i > 3 || n - i - 1 < 0{
+                return 
+            }
+            
+            let block_behind = &self.chain[i];
+            
+            
+            
+        }
     }
     
 }

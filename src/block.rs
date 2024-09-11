@@ -9,18 +9,12 @@ pub struct Block {
     previous_hash: Option<String>,
     nonce: u64,
     index_in_chain: u64,
-    /// Internal representation of the bytes of the transactions
-    /// This avoids to recompute it every time that `bytes` is called
-    #[serde(skip)]
-    immutable_bytes: Vec<u8>
 }
 
 impl Block {
     pub fn genesis(transactions: SimpleTransaction) -> Self {
-        let bytes: Vec<u8> = transactions.to_bytes();
         Self {
             transactions,
-            immutable_bytes: bytes,
             nonce: 0,
             index_in_chain: 0,
             previous_hash: None
@@ -52,11 +46,9 @@ impl Block {
         digest(data)
     }
 
-
-
     /// Returns a bytes representation of this block
     pub fn bytes(&self) -> Vec<u8> {
-        let mut bytes = self.immutable_bytes.clone();
+        let mut bytes: Vec<u8> = self.transactions.to_bytes();
         bytes.extend_from_slice(&self.nonce.to_le_bytes());
         if let Some(hash) = &self.previous_hash {
             bytes.extend_from_slice(hash.as_bytes());
@@ -67,10 +59,43 @@ impl Block {
     pub fn transactions(&self) -> &SimpleTransaction {
         &self.transactions
     }
+
+    pub fn nonce(&self) -> u64 {
+        self.nonce
+    }
+    
+    pub fn print_block(&self) {
+        println!("  * nonce    = {}", self.nonce());
+        println!("  * previous = {:?}", self.previous_hash().unwrap());
+        println!("  * hash     = {}", self.hash());
+        println!("  * data     = {:?}", self.transactions);
+    }
 }
 
 impl Debug for Block {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "previous hash = {:?}, nounce = {:?}", self.previous_hash, self.nonce)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::block::Block;
+    use crate::simple_transaction::SimpleTransaction;
+
+    #[test]
+    fn test_hash_consistency()  {
+        let mut b1 = Block::genesis(SimpleTransaction::new());
+        b1.set_nonce(1234);
+        let as_json = serde_json::to_string(&b1).unwrap();
+        let b1_parsed: Block = serde_json::from_str(&as_json).unwrap();
+        assert_eq!(b1.hash(), b1_parsed.hash());
+        
+        let mut b2 = Block::new_after_block(SimpleTransaction::from_str("Hello world"), &b1);
+        b2.set_nonce(9876);
+        let as_json = serde_json::to_string(&b2).unwrap();
+        let b2_parsed: Block = serde_json::from_str(&as_json).unwrap();
+        assert_eq!(b2.hash(), b2_parsed.hash());
+    }
+    
 }
