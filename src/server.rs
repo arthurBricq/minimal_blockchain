@@ -1,10 +1,10 @@
-use crate::simple_transaction::SimpleTransaction;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use rand::Rng;
 use rouille::{router, Response};
-use crate::block::Block;
-use crate::blockchain::Blockchain;
+use repyh::block::Block;
+use repyh::blockchain::Blockchain;
+use repyh::simple_transaction::SimpleTransaction;
 
 /// Server in charge of keeping track of the pending transactions
 pub struct Server {
@@ -52,8 +52,16 @@ const ACCEPTED: &str = "Accepted";
 
 const REJECTED: &str = "Rejected";
 
-/// Launch a webserver, associated with a transaction server, that will
-/// answer to workers.
+/// Launch a webserver, associated with a transaction server, that will answer to workers and external clients.
+/// 
+/// Supported end-points
+/// * /submit_transaction/DATA : registers a new transaction in the mempool to be saved
+/// 
+/// * /get_transaction/        : returns a single transaction that is in the mempool.
+/// 
+/// * /submit_block/DATA       : registers a new block mined by one of the worker. 
+///                              The server keeps track of the nodes submitted by the workers to 
+///                              have its own version of the blockchain.
 pub fn run_web_server(server: Arc<Mutex<Server>>) {
     rouille::start_server("localhost:8000", move |request| {
         router!(request,

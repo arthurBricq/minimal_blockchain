@@ -1,7 +1,9 @@
-use repyh::server::{run_web_server, Server};
 use repyh::simple_transaction::SimpleTransaction;
 use std::sync::{Arc, Mutex};
 use env_logger::Env;
+use crate::server::{run_web_server, Server};
+
+mod server;
 
 /// The server is in charge of
 /// - keeping track of pending transactions.

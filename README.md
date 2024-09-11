@@ -1,4 +1,4 @@
-# A mock Block Chain in Rust
+# Proof-of-work Blockchain in Rust
 
 A simple blockchain to store **text information** immutably across the network.
 
@@ -38,6 +38,14 @@ cargo run --bin node
 
 Due to a current limitation (see below), you have to  **start all you workers in the first 10 seconds after that you launch the first worker**.
 
+3. To run the test
+
+Although not well covered yet, I have started to implement tests.
+
+```console
+cargo test
+```
+
 # Current limitations
 
 List of remaining problems that I am aware of
@@ -49,6 +57,26 @@ List of remaining problems that I am aware of
 - Orphan blocks : on my machine they are very common. The basic behavior is also unit-tested, but also here they are not well handled and sometimes you end up with an orphan block that sticks forever.
 
 - Downloading the chain from other workers when a new worker connects. I still haven't implemented it, spending too much time debugging the divergence issue. **So when you run the setup, you have to start all you workers in the first 10 seconds**.
+
+# Files
+
+The project contains 3 executables (described in the getting started).
+
+The shared library includes:
+
+- `block.rs`: implementation of one block
+- `blockchain.rs`: implementation of the blockchain, in charge of keeping track of the different chains formed so far and always knowing which is the **main chain**
+- `mining.rs`: the async function to find the nonce that solves the problem.
+- `simple_transaction.rs`: description of each transaction. It's just plain utf8 text.
+
+Finally, all the async logic is dispatched as follows.
+
+- server-side
+    - `server.rs`: the centralized transaction server
+- worker-side
+    - `main_worker.rs` is the async worker in charge of mining transactions, it is where everything is coordinated.
+    - `p2p_network.rs`: in charge of setting up the `libp2p.rs` communcation and to handle it throughout the life of the workers.
+
 
 # Resources
 
