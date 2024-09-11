@@ -14,6 +14,8 @@ A simple blockchain to store **text information** immutably across the network.
 
 - Transaction are deleted server from the mempool when the message is written deep enough in the blockchain representation of the server.
 
+- **Orphan** blocks (*blocks received but not attached to any chain*) are stored and eventually placed.
+
 # Getting started
 
 1. Run the server to dispatch transactions
@@ -28,23 +30,25 @@ Note that the server is instantiated with a bunch of initial transactions (see `
 cargo run --bin submit -- "All that is gold does not glitter, Not all those who wander are lost; The old that is strong does not wither, Deep roots are not reached by the frost."
 ```
 
-2. Run one (or many) workers, each in his own terminal
+2. Run one (or many) workers, each in his own terminal. Each worker will wait about 20 seconds before starting to mine, to make sure that other peers detected him.
 
 ```console
 cargo run --bin node
 ```
 
-# Remaining work 
+Due to a current limitation (see below), you have to  **start all you workers in the first 10 seconds after that you launch the first worker**.
 
-List of remaining challenges
+# Current limitations
 
-1. Blockchain divergence usually takes a few iteration to be resolved.
+List of remaining problems that I am aware of
 
-2. Downloading the chain from other workers when a new worker connects.
+- Blockchain divergence usually takes a few iteration to be resolved.
 
-3. Even though it is unit-tested, there seems to be problems with keeping track of the divergence
+- Even though it is unit-tested, there are still situations in which the divergence does not resolve.
 
-4. **Orphan blocks** : when nodes are received in the wrong order, divergence is not handled. If one worker is lucky and mines really fast A->B->C, it is possible that another worker reads 'C' before 'B'. Therefore, the worker 'previous hash' of 'C' will not exist.
+- Orphan blocks : on my machine they are very common. The basic behavior is also unit-tested, but also here they are not well handled and sometimes you end up with an orphan block that sticks forever.
+
+- Downloading the chain from other workers when a new worker connects. I still haven't implemented it, spending too much time debugging the divergence issue. **So when you run the setup, you have to start all you workers in the first 10 seconds**.
 
 # Resources
 
@@ -52,3 +56,4 @@ List of remaining challenges
 - Book about async await https://rust-lang.github.io/async-book/03_async_await/01_chapter.html
 - Tokio documentation https://tokio.rs/tokio/tutorial/spawning
 - libp2p.rs documentation (and mostly the `chat` example) https://github.com/libp2p/rust-libp2p/blob/master/examples/chat/src/main.rs
+- bitcoin white paper

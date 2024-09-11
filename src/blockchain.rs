@@ -4,7 +4,7 @@ use crate::block::Block;
 use crate::simple_transaction::SimpleTransaction;
 
 /// Depth below the head of a chain after which we consider that all workers must have agreed on.
-const SAFE_HORIZON: i64 = 4;
+const SAFE_HORIZON: i64 = 10;
 
 /// Keeps track of the main chain and of possible divergence on the last `SAFE_HORIZON` layers.
 pub struct Blockchain {
@@ -13,7 +13,7 @@ pub struct Blockchain {
     /// The forked chain is then a list of blocks starting from this hash.
     /// TODO (optimization) store the index of the root instead of storing the hash of the root
     pending_forks: HashMap<String, Vec<Block>>,
-    /// A pool of blocks that worker received but that can't be attached to no other. 
+    /// A pool of blocks that worker received but that can't be attached to no other.
     orphan: VecDeque<Block>
 }
 
@@ -32,26 +32,42 @@ impl Blockchain {
         self.chain.push(block);
     }
 
-    /// Returns true if the main chain was updated, false otherwise.
-    /// If the block is not set inserted in the main chain, it is kept as a hypothesis.
-    pub fn add_block_safe(&mut self, block: Block) -> bool {
+    /// Internal function to assign blocks to one of the chain.
+    ///
+    /// Tries to add the block first to the main chain, then to any of the forked chain.
+    ///
+    /// Returns  (added_to_main_chain, added_to_forked_chain), that is:
+    ///
+    /// * (true,  _)      if block was added on the main chain
+    /// * (false, true)   if the block was added on one of the forked chain
+    /// * (false, false)  if the block was not added to ANY chain, meaning that this block is an
+    ///                   orphan.
+    fn assign_block(&mut self, block: Block) -> (bool, bool) {
         // The previous hash is the key that indicates where this block is linked.
         let previous_hash = block.previous_hash().unwrap();
 
         // Try to add this block to the main chain
-        let respoonse = if previous_hash == self.chain.last().unwrap().hash() {
+        if previous_hash == self.chain.last().unwrap().hash() {
             self.chain.push(block);
-            true
+            (true, true)
         } else {
             // Try to place this block at the head of one of the forked chain
             for (_, chain) in &mut self.pending_forks {
                 // Try to place this block on the given chain
                 if previous_hash == chain.last().unwrap().hash() {
                     chain.push(block);
-                    return false;
+                    return (false, true)
                 }
             }
+            (false, false)
+        }
+    }
 
+    /// Returns true if the main chain was updated, false otherwise.
+    /// If the block is not set inserted in the main chain, it is kept as a hypothesis or as an orphan
+    pub fn add_block_safe(&mut self, block: Block) -> bool {
+        let (added_to_main, added_to_forked) = self.assign_block(block.clone());
+        if !added_to_main && !added_to_forked {
             // If we arrived here, it means that
             // - not a single hypothesis could accept the new block at his head)
             // - the main chain could not
@@ -62,6 +78,7 @@ impl Blockchain {
             //    block. This happens when the communication fails. In this case, we store it
             //    and will try later on to fit it somewhere
 
+            let previous_hash = block.previous_hash().unwrap();
             let is_new_fork = self.chain.iter().any(|block| block.hash() == previous_hash);
             if is_new_fork {
                 self.pending_forks.insert(previous_hash, vec![block]);
@@ -69,13 +86,26 @@ impl Blockchain {
                 self.orphan.push_back(block);
             }
 
-            false
-        };
-        
-        
-        
-        
-        respoonse
+            return false
+        } else {
+            // Since we managed to assign the block, we can try to assign our orphan blocks
+            let mut new_orphan = VecDeque::new();
+            // TODO I see that this is terrible in term of memory... 
+            //      But it shouldn't be too hard to improve.
+            while let Some(lonely_block) = self.orphan.pop_front() {
+                let (main, forked) = self.assign_block(lonely_block.clone());
+                if !main && !forked {
+                    new_orphan.push_back(lonely_block);
+                }
+            }
+            self.orphan = new_orphan;
+        }
+
+        // After adding a block, we can now try to place our oprhan...
+        // TODO
+
+
+        added_to_main
     }
 
     /// We check all the hypothesis over our main chain.
@@ -113,13 +143,10 @@ impl Blockchain {
 
         // Chain cleanup
         // We remove every pending fork that is more than N blocks behind the main head.
-        // TODO uncomment these lines, for now I am trying to debug & this line could be the reason
-        //      of some problems.G
-
-        // self.pending_forks.retain(|_, chain| {
-        //     let chain_len = chain.last().map(|block| block.index_in_chain()).unwrap_or(0);
-        //     chain_len as i64 > len as i64 - SAFE_HORIZON
-        // });
+        self.pending_forks.retain(|_, chain| {
+            let chain_len = chain.last().map(|block| block.index_in_chain()).unwrap_or(0);
+            chain_len as i64 > len as i64 - SAFE_HORIZON
+        });
 
     }
     
@@ -156,14 +183,15 @@ impl Blockchain {
             }
         }
 
-        log::info!("Main chain");
+        log::info!(" ~ Main chain");
         print_single_chain(0, &self.chain);
         self.pending_forks.iter().for_each(|(start_hash, blocks)| {
             if let Some(root) = self.chain.iter().position(|b| &b.hash() == start_hash) {
                 log::info!(" ~ new fork");
-                print_single_chain(root, blocks);
+                print_single_chain(root + 1, blocks);
             }
         });
+        log::info!(" ~ Orphan: {:?}", self.orphan)
     }
 
 }
@@ -269,7 +297,7 @@ mod tests {
         assert_eq!(2, chain.len());
         chain.add_block_safe(b3);
         assert_eq!(2, chain.len());
-        
+
         // We can now check that we have 1 orphan block
         assert_eq!(1, chain.orphan.len());
 
@@ -277,5 +305,6 @@ mod tests {
         // It should detect that it can create a new chain longer
         chain.add_block_safe(b2);
         assert_eq!(4, chain.len());
+        assert_eq!(0, chain.orphan.len());
     }
 }
