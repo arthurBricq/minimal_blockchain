@@ -1,8 +1,11 @@
+extern crate log;
+
 use repyh::block::Block;
 use repyh::simple_transaction::SimpleTransaction;
 use reqwest::Client;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
+use env_logger::Env;
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_util::sync::CancellationToken;
@@ -38,7 +41,7 @@ pub async fn mine(
         if hash.starts_with(&start_pattern) {
             return Some(hash)
         }
-        
+
         // Always check if this thread was asked to be cancelled
         if cancellation_token.is_cancelled() {
             return None
@@ -50,6 +53,12 @@ pub async fn mine(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let env = Env::default()
+        .filter_or("MY_LOG_LEVEL", "info")
+        .write_style_or("MY_LOG_STYLE", "always");
+    env_logger::init_from_env(env);
+    log::info!("starting up");
+
     let (tx_local_block, rx_local_block) = mpsc::unbounded_channel();
     let (tx_network_blocks, mut rx_network_blocks) = mpsc::unbounded_channel::<String>();
 
@@ -70,7 +79,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let cloned_tx = tx_local_block.clone();
         let cloned_chain = chain.clone();
         // let tx1_c = tx1.clon
-        
+
         let (mut tx1, rx1) = oneshot::channel();
 
         // Create a new task, but don't await on the task
@@ -82,20 +91,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Some(msg) = rx_network_blocks.recv() => {
                 // Extract the new block
                 let block: Block = serde_json::from_str(&msg).unwrap();
-                println!("CANCELLATION");
+                log::info!("CANCELLATION");
                 block.print_block();
 
-                
+
                 if chain.lock().unwrap().add_block_safe(block) {
                     // This means we accept the block from another worker.
-                    println!("cancellation accepted");
+                    log::info!("cancellation accepted");
                     token.cancel();
                 } else {
-                    println!("cancellation REJECTED, with chain ?");
+                    log::info!("cancellation REJECTED, with chain ?");
                 }
-                
+
                 chain.lock().unwrap().print_chain();
-                
+
             }
             // This branch is necessary to 'listen' for mining finished
             val = rx1 => {}
@@ -114,7 +123,7 @@ async fn request_new_transaction_and_work(
     chain: Arc<Mutex<Blockchain>>,
     tx1: oneshot::Sender<()>,
 ) -> Result<(), Box<dyn Error>> {
-    
+
     // Ask the server for pending transaction
     let response = if let Ok(response) = async_req("http://localhost:8000/get_transaction", client).await {
         Some(response)
@@ -127,13 +136,13 @@ async fn request_new_transaction_and_work(
             // decrypt the transaction
             let as_text = res.text().await?;
             let parsed: SimpleTransaction = serde_json::from_str(&as_text).unwrap();
-            println!("Received new transaction: {parsed:?}");
+            log::info!("Received new transaction: {parsed:?}");
 
             // Start to mine the block
             // We use a cancellation token to abort the task
             let mut new_block = chain.lock().unwrap().get_candidate_block(parsed);
             if let Some(_) = mine(&mut new_block, 5, cancellation_token.clone()).await {
-                println!("  Finished to mine !");
+                log::info!("  Finished to mine !");
                 new_block.print_block();
 
                 // Broadcast the mined bitcoin to the swarm.
@@ -146,13 +155,12 @@ async fn request_new_transaction_and_work(
 
                 // Set it in the chain.
                 chain.lock().unwrap().add_block_unsafe(new_block);
-                
-                println!("Chain size          : {}", chain.lock().unwrap().len());
+
                 chain.lock().unwrap().print_chain();
 
                 // Swap the token...
                 cancellation_token.cancel();
-            } 
+            }
         }
         _ => panic!("wtf")
     }

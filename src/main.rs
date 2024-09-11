@@ -1,5 +1,4 @@
 use repyh::block::Block;
-use repyh::client::Client;
 use repyh::mining;
 use repyh::simple_transaction::SimpleTransaction;
 
@@ -20,5 +19,4 @@ fn main() {
     let hash = mining::mine(&mut next, DIFFICULTY);
     println!("\nresult =  {hash}");
     println!("block  =  {next:?}");
-
 }

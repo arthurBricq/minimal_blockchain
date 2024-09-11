@@ -49,6 +49,7 @@ impl Blockchain {
     }
     
     pub fn print_chain(&self) {
+        println!("Chain size          : {}", self.len());
         self.chain.iter().for_each(|b| println!("     ^ {:} --> {:?}", b.hash(), b.transactions()))
     }
     

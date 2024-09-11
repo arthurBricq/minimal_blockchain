@@ -50,7 +50,7 @@ async fn handle_swarm(
     mut rx_local_blocks: UnboundedReceiver<String>,
     mut tx_network_blocks: UnboundedSender<String>
 ) {
-    println!("Joining swarm ...");
+    log::info!("Joining swarm ...");
 
     // Read full lines from stdin
     let mut stdin = io::BufReader::new(io::stdin()).lines();
@@ -59,13 +59,6 @@ async fn handle_swarm(
     loop {
         tokio::time::sleep(Duration::from_secs(1)).await;
         select! {
-            Ok(Some(line)) = stdin.next_line() => {
-                if let Err(e) = swarm
-                    .behaviour_mut().gossipsub
-                    .publish(topic.clone(), line.as_bytes()) {
-                    println!("Publish error: {e:?}");
-                }
-            }
             Some(msg) = rx_local_blocks.recv() => {
                 println!("   (about to broadcast)  ");
                 if let Err(e) = swarm
