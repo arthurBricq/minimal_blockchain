@@ -62,14 +62,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 // Extract the new block
                 let block: Block = serde_json::from_str(&msg).unwrap();
                 if block.is_hash_valid(DIFFICULTY) {
-                    log::info!("Block from network arrived.");
-                    block.print_block();
+                    log::info!("Block from network arrived: {:?}", block.transactions());
                     if chain.lock().unwrap().add_block_safe(block) {
                         // This means we accept the block from another worker.
-                        log::info!("cancellation accepted.");
+                        log::info!("--> accepted.");
                         token.cancel();
                     } else {
-                        log::error!("cancellation rejected.");
+                        log::error!("--> rejected.");
                     }
                     chain.lock().unwrap().print_chain();
                 }
@@ -111,7 +110,7 @@ async fn request_transaction_and_mine(
                     return Ok(());
                 }
 
-                log::info!("Received new transaction: {parsed:?}");
+                log::info!("Mining new block: {parsed:?}");
 
                 // Start to mine the block
                 // We use a cancellation token to abort the task

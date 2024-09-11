@@ -89,10 +89,13 @@ impl Blockchain {
 
         // Chain cleanup
         // We remove every pending fork that is more than N blocks behind the main head.
-        self.pending_forks.retain(|_, chain| {
-            let chain_len = chain.last().map(|block| block.index_in_chain()).unwrap_or(0);
-            chain_len as i64 > len as i64 - SAFE_HORIZON
-        });
+        // TODO uncomment these lines, for now I am trying to debug & this line could be the reason
+        //      of some problems.G
+
+        // self.pending_forks.retain(|_, chain| {
+        //     let chain_len = chain.last().map(|block| block.index_in_chain()).unwrap_or(0);
+        //     chain_len as i64 > len as i64 - SAFE_HORIZON
+        // });
 
     }
     
@@ -112,7 +115,7 @@ impl Blockchain {
     pub fn has_transaction(&self, tx: &SimpleTransaction) -> bool {
         self.chain.iter().any(|block| block.transactions() == tx)
     }
-    
+
     /// Returns true if the transaction is written before the 'safe' horizon,
     /// which mean that we consider that all workers have agreed upon this position.
     pub fn is_transaction_safely_written(&self, tx: &SimpleTransaction) -> bool {
@@ -123,10 +126,20 @@ impl Blockchain {
     }
 
     pub fn print_chain(&self) {
-        log::info!("Main chain size          : {}", self.len());
-        self.chain.iter().for_each(|b| log::info!("     ^ {:?}", b.transactions()));
-        log::info!("Number of pending forks  : {}", self.pending_forks.len());
-        self.pending_forks.iter().for_each(|(_, blocks)| log::info!("  * size of fork = {}", blocks.len()));
+        fn print_single_chain(start: usize, blocks: &[Block]) {
+            for (i, b) in blocks.iter().enumerate() {
+                log::info!("       ({})    {:?}", i + start, b.transactions())
+            }
+        }
+
+        log::info!("Main chain");
+        print_single_chain(0, &self.chain);
+        self.pending_forks.iter().for_each(|(start_hash, blocks)| {
+            if let Some(root) = self.chain.iter().position(|b| &b.hash() == start_hash) {
+                log::info!(" ~ new fork");
+                print_single_chain(root + 1, blocks);
+            }
+        });
     }
 
 }
@@ -214,5 +227,28 @@ mod tests {
 
         // And there should still be the pending fork, because maybe some more nodes will come later on
         assert_eq!(1, chain.pending_forks.len());
+    }
+
+    #[test]
+    fn test_divergence_with_unordered_buffer() {
+
+        // Create a chain
+        let mut chain = Blockchain::new();
+        let b1 = chain.get_candidate_block(SimpleTransaction::new());
+        chain.add_block_safe(b1.clone());
+
+        // Create three block on top of each others
+        let b2 = Block::new_after_block(SimpleTransaction::from_str("1"), &b1);
+        let b3 = Block::new_after_block(SimpleTransaction::from_str("1"), &b2);
+
+        // If you send `b3` before `b2`, the main chain must not be updated of course
+        assert_eq!(2, chain.len());
+        chain.add_block_safe(b3);
+        assert_eq!(2, chain.len());
+
+        // But after you send `b2`, the chain must not be of size '3' but indeed of size '4'
+        // It should detect that it can create a new chain longer
+        chain.add_block_safe(b2);
+        assert_eq!(4, chain.len());
     }
 }
