@@ -49,6 +49,11 @@ impl Block {
         let data = self.bytes();
         digest(data)
     }
+    
+    pub fn is_hash_valid(&self, difficulty: usize) -> bool {
+        let start_pattern = String::from_utf8(vec![b'0'; difficulty]).unwrap();
+        self.hash().starts_with(&start_pattern)
+    }
 
     /// Returns a bytes representation of this block
     pub fn bytes(&self) -> Vec<u8> {

@@ -14,6 +14,7 @@ use repyh::mining::mine;
 
 mod p2p_network;
 
+const DIFFICULTY: usize = 5;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -47,27 +48,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // Create a new task, but don't await on the task
         tokio::spawn(async move {
-            request_transaction_and_work(cloned_tx, cloned_client, cloned_token, cloned_chain, tx1).await;
+            request_transaction_and_mine(cloned_tx, cloned_client, cloned_token, cloned_chain, tx1).await;
         });
 
         tokio::select! {
             Some(msg) = rx_network_blocks.recv() => {
+                // New block received from the network
                 // Extract the new block
                 let block: Block = serde_json::from_str(&msg).unwrap();
-                log::info!("CANCELLATION");
-                block.print_block();
-
-
-                if chain.lock().unwrap().add_block_safe(block) {
-                    // This means we accept the block from another worker.
-                    log::info!("cancellation accepted");
-                    token.cancel();
-                } else {
-                    log::info!("cancellation REJECTED, with chain ?");
+                if block.is_hash_valid(DIFFICULTY) {
+                    log::info!("Block from network arrived.");
+                    block.print_block();
+                    if chain.lock().unwrap().add_block_safe(block) {
+                        // This means we accept the block from another worker.
+                        log::info!("cancellation accepted.");
+                        token.cancel();
+                    } else {
+                        log::error!("cancellation rejected.");
+                    }
+                    chain.lock().unwrap().print_chain();
                 }
-
-                chain.lock().unwrap().print_chain();
-
+                
             }
             // This branch is necessary to 'listen' for mining finished
             val = rx1 => {}
@@ -80,13 +81,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
 /// * Ask the transaction server for a new transaction to mine
 /// * Start to mine while listening for cancellation
 /// * If mining finished, forward your block to the network
-async fn request_transaction_and_work(
+async fn request_transaction_and_mine(
     tx_local_block: UnboundedSender<String>,
     client: Client,
     cancellation_token: CancellationToken,
     chain: Arc<Mutex<Blockchain>>,
     tx1: oneshot::Sender<()>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error>> 
+{
 
     // Ask the server for pending transaction
     let response = if let Ok(response) = async_req("http://localhost:8000/get_transaction", client).await {
@@ -105,7 +107,7 @@ async fn request_transaction_and_work(
             // Start to mine the block
             // We use a cancellation token to abort the task
             let mut new_block = chain.lock().unwrap().get_candidate_block(parsed);
-            if let Some(_) = mine(&mut new_block, 5, cancellation_token.clone()).await {
+            if let Some(_) = mine(&mut new_block, DIFFICULTY, cancellation_token.clone()).await {
                 log::info!("  Finished to mine !");
                 new_block.print_block();
 
