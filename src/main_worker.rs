@@ -3,7 +3,7 @@ use repyh::simple_transaction::SimpleTransaction;
 use reqwest::Client;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_util::sync::CancellationToken;
 use repyh::blockchain::Blockchain;
@@ -38,8 +38,10 @@ pub async fn mine(
         if hash.starts_with(&start_pattern) {
             return Some(hash)
         }
+        
         // Always check if this thread was asked to be cancelled
         if cancellation_token.is_cancelled() {
+            println!("we were cancelled..");
             return None
         }
     }
@@ -50,25 +52,33 @@ pub async fn mine(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let (tx_local_block, rx_local_block) = mpsc::unbounded_channel();
-    let (tx_network_blocks, mut rx_network_blocks) = mpsc::unbounded_channel();
+    let (tx_network_blocks, mut rx_network_blocks) = mpsc::unbounded_channel::<String>();
 
     // Create a thread that listens to the P2P network
     // This allows us to know if another node found a node, and if so, to check it...
-    p2p_network::join_p2p_network(rx_local_block, tx_network_blocks).expect("TODO: panic message");
+    // p2p_network::join_p2p_network(rx_local_block, tx_network_blocks).expect("TODO: panic message");
     
     // Leave some initial time so that the P2P network setup correctly
-    tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
+    // tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
     
     let chain = Arc::new(Mutex::new(Blockchain::new()));
     let client = reqwest::Client::new();
-    let token = CancellationToken::new();
 
     loop {
+        let token = CancellationToken::new();
         let cloned_token = token.clone();
         let cloned_client = client.clone();
         let cloned_tx = tx_local_block.clone();
         let cloned_chain = chain.clone();
+        // let tx1_c = tx1.clon
         
+        let (mut tx1, rx1) = oneshot::channel();
+
+        // Create a new task, but don't await on the task
+        tokio::spawn(async move {
+            request_new_transaction_and_work(cloned_tx, cloned_client, cloned_token, cloned_chain, tx1).await;
+        });
+
         tokio::select! {
             Some(msg) = rx_network_blocks.recv() => {
                 // Extract the new block
@@ -77,20 +87,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("{block:?}");
                 token.cancel();
             }
-            _ = request_new_transaction_and_work(cloned_tx, cloned_client, cloned_token, cloned_chain) => {
-                println!("Mining went well :)")
-            }
+            // This branch is necessary to 'listen' for mining finished
+            val = rx1 => {}
         }
-        
+
+
     }
+
+
 }
 
 async fn request_new_transaction_and_work(
     tx_local_block: UnboundedSender<String>,
     client: Client,
     cancellation_token: CancellationToken,
-    chain: Arc<Mutex<Blockchain>>
+    chain: Arc<Mutex<Blockchain>>,
+    tx1: oneshot::Sender<()>,
 ) -> Result<(), Box<dyn Error>> {
+    
     // Ask the server for pending transaction
     let response = if let Ok(response) = async_req("http://localhost:8000/get_transaction", client).await {
         Some(response)
@@ -108,19 +122,26 @@ async fn request_new_transaction_and_work(
             // Start to mine the block
             // We use a cancellation token to abort the task
             let mut new_block = chain.lock().unwrap().get_candidate_block(parsed);
-            if let Some(hash) = mine(&mut new_block, 5, cancellation_token).await {
-                println!("Finished to mine   : {hash}");
-                println!("Finished to block ! : {new_block:?}");
-                
+            if let Some(hash) = mine(&mut new_block, 4, cancellation_token.clone()).await {
+                println!("Finished to mine    : {hash}");
+                println!("Finished to block   : {new_block:?}");
+                println!("Chain size          : {}", chain.lock().unwrap().len());
+
                 // Broadcast the mined bitcoin to the swarm.
                 tx_local_block
                     .send(serde_json::to_string(&new_block).unwrap())
                     .expect("Broadcasting mined block did not work.");
-                
+
                 // Communicate to the server that this block was mined.
-                
+                tx1.send(()).unwrap();
+
                 // Set it in the chain.
-                chain.lock().unwrap().add_block_unsafe(new_block)
+                chain.lock().unwrap().add_block_unsafe(new_block);
+
+                // Swap the token...
+                cancellation_token.cancel();
+            } else {
+                println!("could not mine")
             }
         }
         _ => panic!("wtf")

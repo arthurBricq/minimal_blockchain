@@ -32,9 +32,14 @@ impl Blockchain {
     pub fn last_transaction(&self) -> &SimpleTransaction {
         self.chain.last().unwrap().transactions()
     }
-    
+
+    /// Returns a block at the last stage of the chain ready to be mined
     pub fn get_candidate_block(&self, transaction: SimpleTransaction) -> Block {
         Block::new_after_block(transaction, self.chain.last().unwrap())
+    }
+    
+    pub fn len(&self) -> usize {
+        self.chain.len()
     }
     
 }
