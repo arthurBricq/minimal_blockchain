@@ -58,6 +58,13 @@ const REJECTED: &str = "Rejected";
 pub fn run_web_server(server: Arc<Mutex<Server>>) {
     rouille::start_server("localhost:8000", move |request| {
         router!(request,
+            (GET) (/submit_transaction/{data: String}) => {
+                // Worker ask for a random transaction in the list from the pending ones
+                println!("A client submitted a new transaction: {data}");
+                server.lock().unwrap().submit_transaction(SimpleTransaction::from_str(&data));
+                Response::text("submitted")
+            },
+            
             (GET) (/get_transaction) => {
                 // Worker ask for a random transaction in the list from the pending ones
                 println!("Worker ask for previous transaction !");

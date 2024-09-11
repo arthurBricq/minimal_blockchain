@@ -16,7 +16,11 @@ A simple blockchain to store **text information** immutably across the network.
 cargo run --bin server
 ```
 
-Note that the server is instantiated with a bunch of initial transactions (see `main_server.rs`)
+Note that the server is instantiated with a bunch of initial transactions (see `main_server.rs`), but you can yourself add a transaction to be saved on the chain.
+
+```console
+cargo run --bin submit -- "All that is gold does not glitter, Not all those who wander are lost; The old that is strong does not wither, Deep roots are not reached by the frost."
+```
 
 2. Run one (or many) workers, each in his own terminal
 

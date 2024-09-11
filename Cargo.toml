@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
-name = "client"
+name = "submit"
 path = "src/not_used/main_client.rs"
 
 [[bin]]

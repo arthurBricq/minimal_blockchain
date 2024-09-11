@@ -2,7 +2,12 @@ use std::error::Error;
 
 /// A client to submit a transaction to the server
 fn main() -> Result<(), Box<dyn Error>> {
-    let resp = reqwest::blocking::get("http://localhost:8000/register_worker/11")?.text()?;
-    println!("Received: {:#?}", resp);
+    
+    if let Some(text) = std::env::args().nth(1) {
+        println!("Sending to server: {text}");
+        let resp = reqwest::blocking::get(format!("http://localhost:8000/submit_transaction/{}", text))?.text()?;
+        println!("Received: {:#?}", resp);
+    }
+    
     Ok(())
 }
