@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::collections::HashMap;
 use crate::block::Block;
 use crate::simple_transaction::SimpleTransaction;
@@ -52,37 +53,41 @@ impl Blockchain {
     /// We check all the hypothesis over our main chain.
     /// If one of them is longer, then we switch to this one.
     pub fn resolve_pending_forks(&mut self) {
-        let len = self.chain.len() - 1; 
+        let len = (self.chain.len() - 1) as u64; 
          
         // Find the longest chain among the forks
         let best_fork = self.pending_forks
             .iter()
-            .max_by_key(|(_, chain)|
+            .filter(|(start, chain)|
+                chain.last().map(|block| block.index_in_chain()).unwrap_or(0) > len
+            ).max_by_key(|(_, chain)|
                 chain.last().map(|block| block.index_in_chain()).unwrap_or(0)
             );
         
-        
+        // If we have found a better fork, then perform the swapping
         if best_fork.is_some() {
             // Remove the best fork from the pending ones.
             // This allows us to get ownership.
             let start = best_fork.unwrap().0.clone();
             let new_chain = self.pending_forks.remove(&start).unwrap();
-            let new_len = new_chain.last().map(|b| b.index_in_chain()).unwrap_or(0) as usize;
             
-            // Check if the longest chain is longer than our main branch
-            if new_len > len {
-                // Find the common root
-                if let Some(root) = self.chain.iter().position(|b| b.hash() == start) {
-                    // Remove everything after the root
-                    self.chain.truncate(root + 1);
+            if let Some(root) = self.chain.iter().position(|b| b.hash() == start) {
+                // Remove everything after the root
+                self.chain.truncate(root + 1);
 
-                    // Add the entire new chain
-                    for block in new_chain {
-                        self.chain.push(block)
-                    }
+                // Add the entire new chain
+                for block in new_chain {
+                    self.chain.push(block)
                 }
             }
         }
+        
+        // Chain cleanup
+        // We remove every pending fork who is more than N blocks behind
+        self.pending_forks.retain(|_, chain| {
+            let chain_len = chain.last().map(|block| block.index_in_chain()).unwrap_or(0);
+            chain_len as i64 > len as i64 - 10
+        });
   
     }
     
@@ -187,7 +192,7 @@ mod tests {
         chain.resolve_pending_forks();
         assert_eq!(4, chain.len());
         
-        // And there should not be anymore pending forks
-        assert_eq!(0, chain.pending_forks.len());
+        // And there should still be the pending fork, because maybe some more nodes will come later on
+        assert_eq!(1, chain.pending_forks.len());
     }
 }
