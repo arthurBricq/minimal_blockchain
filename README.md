@@ -30,10 +30,11 @@ cargo run --bin node
 
 # Remaining work 
 
-There is mainly two huge problems. 
+List of remaining challenges
 
 1. Blockchain divergence: when two workers finish to mine at roughly the same time, they will both have the time to dispatch their node and they will both 
 2. Removing pending transactions from the server
+3. Downloading the chain from other workers when a new worker connects.
 
 # Resources
 
