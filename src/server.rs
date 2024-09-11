@@ -10,7 +10,11 @@ use crate::blockchain::Blockchain;
 pub struct Server {
     /// Pool of pending transactions
     mempool: VecDeque<SimpleTransaction>,
-    /// The current best blockchain, containing all the data
+    /// The server holds a representation of blockchain that it keeps building using all the blocks
+    /// received by workers.
+    /// Keeping track of the blockchain allows the server to safely remove pending transactions, once
+    /// they are past the safe depth, and to (in the future) provide to new workers with am up-to-date
+    /// version of the chain.
     blockchain: Blockchain
 }
 
@@ -26,7 +30,8 @@ impl Server {
         self.mempool.push_back(tx)
     }
 
-    pub fn get_pending_transaction(&self) -> Option<SimpleTransaction> {
+    /// Returns one of the transaction in the pool
+    fn get_pending_transaction(&self) -> Option<SimpleTransaction> {
         if self.mempool.is_empty() {
             None
         } else {
@@ -35,18 +40,12 @@ impl Server {
         }
     }
     
-    /// Adds a block in the internal chain and remove the transaction from the poo
-    pub fn add_block_safe(&mut self, block: Block) -> bool {
-        if self.blockchain.add_block_safe(block) {
-            let transaction_to_remove = self.blockchain.last_transaction();
-            if let Some(index_to_remove) = self.mempool.iter().position(|tx| tx == transaction_to_remove) {
-                self.mempool.remove(index_to_remove);
-            }
-            true
-        } else {
-            false
-        }
+    /// Checks if some of the transaction on the pool is safely written in the chain, 
+    /// and if so remove it from the pool.
+    fn resolve_safe_transactions(&mut self) {
+        self.mempool.retain(|tx| !self.blockchain.is_transaction_safely_written(&tx))
     }
+    
 }
 
 const ACCEPTED: &str = "Accepted";
@@ -64,10 +63,9 @@ pub fn run_web_server(server: Arc<Mutex<Server>>) {
                 server.lock().unwrap().submit_transaction(SimpleTransaction::from_str(&data));
                 Response::text("submitted")
             },
-            
+
             (GET) (/get_transaction) => {
                 // Worker ask for a random transaction in the list from the pending ones
-                println!("Worker ask for previous transaction !");
                 if let Some(transaction) = server.lock().unwrap().get_pending_transaction() {
                     let as_json = serde_json::to_string(&transaction).unwrap();
                     Response::text(as_json)
@@ -79,15 +77,13 @@ pub fn run_web_server(server: Arc<Mutex<Server>>) {
             (GET) (/submit_block/{data: String}) => {
                 // Parse the block sent by the client
                 let received: Block = serde_json::from_str(&data).unwrap();
-
-                // TODO This is not the consensus protocol
-                //      I have to change this, somehow.
-                // Try to append it to the server
-                if server.lock().unwrap().add_block_safe(received) {
-                    Response::text(ACCEPTED)
-                } else {
-                    Response::text(REJECTED)
-                }
+                log::info!("Server received block.");
+                server.lock().unwrap().blockchain.add_block_safe(received);
+                server.lock().unwrap().blockchain.resolve_pending_forks();
+                server.lock().unwrap().blockchain.print_chain();
+                server.lock().unwrap().resolve_safe_transactions();
+                log::info!("Remaining transaction in the pool: {:?}", server.lock().unwrap().mempool.len());
+                Response::text("")
             },
 
             _ => Response::empty_404()

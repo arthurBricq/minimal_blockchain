@@ -21,7 +21,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let env = Env::default()
         .filter_or("MY_LOG_LEVEL", "info")
         .write_style_or("MY_LOG_STYLE", "always");
-    env_logger::init_from_env(env);
+
+    env_logger::builder()
+        // setting this to None disables the timestamp
+        .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
+        .parse_env(env)
+        .init();
 
     let (tx_local_block, rx_local_block) = mpsc::unbounded_channel();
     let (tx_network_blocks, mut rx_network_blocks) = mpsc::unbounded_channel::<String>();
@@ -86,11 +91,11 @@ async fn request_transaction_and_mine(
     cancellation_token: CancellationToken,
     chain: Arc<Mutex<Blockchain>>,
     mining_finished_signal: oneshot::Sender<()>,
-) -> Result<(), Box<dyn Error>> 
+) -> Result<(), Box<dyn Error>>
 {
 
     // Ask the server for pending transaction
-    let response = if let Ok(response) = async_req("http://localhost:8000/get_transaction", client).await {
+    let response = if let Ok(response) = async_req("http://localhost:8000/get_transaction", &client).await {
         Some(response)
     } else {
         None
@@ -100,39 +105,48 @@ async fn request_transaction_and_mine(
         Some(res) => {
             // decrypt the transaction
             let as_text = res.text().await?;
-            let parsed: SimpleTransaction = serde_json::from_str(&as_text).unwrap();
-            log::info!("Received new transaction: {parsed:?}");
+            if let Ok(parsed) = serde_json::from_str::<SimpleTransaction>(&as_text) {
+                // We only mine if the transaction is not already written here
+                if chain.lock().unwrap().has_transaction(&parsed) {
+                    return Ok(());
+                }
 
-            // Start to mine the block
-            // We use a cancellation token to abort the task
-            let mut new_block = chain.lock().unwrap().get_candidate_block(parsed);
-            if let Some(_) = mine(&mut new_block, DIFFICULTY, cancellation_token.clone()).await {
-                log::info!("  Finished to mine !");
-                new_block.print_block();
+                log::info!("Received new transaction: {parsed:?}");
 
-                // Broadcast the mined bitcoin to the swarm.
-                tx_local_block
-                    .send(serde_json::to_string(&new_block).unwrap())
-                    .expect("Broadcasting mined block did not work.");
-                
-                // Set it in the chain.
-                chain.lock().unwrap().add_block_unsafe(new_block);
-                chain.lock().unwrap().resolve_pending_forks();
-                chain.lock().unwrap().print_chain();
+                // Start to mine the block
+                // We use a cancellation token to abort the task
+                let mut new_block = chain.lock().unwrap().get_candidate_block(parsed);
+                if let Some(_) = mine(&mut new_block, DIFFICULTY, cancellation_token.clone()).await {
+                    log::info!("  Finished to mine !");
 
-                // Send an interruption for the asynchronous system to retriever a loop.
-                mining_finished_signal.send(()).unwrap();
-                cancellation_token.cancel();
+                    // Broadcast the mined bitcoin to the swarm.
+                    let as_json = serde_json::to_string(&new_block).unwrap();
+                    tx_local_block
+                        .send(as_json.clone())
+                        .expect("Broadcasting mined block did not work.");
+
+                    // Set it in the chain.
+                    chain.lock().unwrap().add_block_unsafe(new_block);
+                    chain.lock().unwrap().resolve_pending_forks();
+                    chain.lock().unwrap().print_chain();
+
+                    // Send it to the server
+                    async_req(&format!("http://localhost:8000/submit_block/{}", as_json), &client).await;
+
+                    // Send an interruption for the asynchronous system to retriever a loop.
+                    mining_finished_signal.send(()).unwrap_or(());
+                    cancellation_token.cancel();
+                }
             }
         }
-        _ => panic!("wtf")
+        _ => {}
     }
     
     Ok(())
 }
 
 /// Sends http request in async rust
-async fn async_req(url: &str, client: reqwest::Client) -> Result<reqwest::Response, Box<dyn Error>> {
+async fn async_req(url: &str, client: &Client) -> Result<reqwest::Response, Box<dyn Error>> {
     let response = client
         .get(url)
         .timeout(std::time::Duration::from_secs(180))

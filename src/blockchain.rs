@@ -3,19 +3,22 @@ use std::collections::HashMap;
 use crate::block::Block;
 use crate::simple_transaction::SimpleTransaction;
 
+/// Depth below the head of a chain after which we consider that all workers must have agreed on.
+const SAFE_HORIZON: i64 = 4;
+
+/// Keeps track of the main chain and of possible divergence on the last `SAFE_HORIZON` layers.
 pub struct Blockchain {
     chain: Vec<Block>,
-    /// A hypothesis starts from an index 'n' and contains a chain of blocks.
     /// Each hypothesis is keyed by the block hash at which divergence started.
-    // TODO (optimization) store the index of the root instead of storing the hash of the root
+    /// The forked chain is then a list of blocks starting from this hash.
+    /// TODO (optimization) store the index of the root instead of storing the hash of the root
     pending_forks: HashMap<String, Vec<Block>>,
 }
 
 impl Blockchain {
-    /// Creates a new blockchain, containing a single block, the genesis.
+    /// Creates a new blockchain, containing a single block (the genesis)
     pub fn new() -> Self {
         let genesis = Block::genesis();
-        // This nonce was generated for a difficulty of 5 zeros
         Self {
             chain: vec![genesis],
             pending_forks: HashMap::new()
@@ -85,10 +88,10 @@ impl Blockchain {
         }
 
         // Chain cleanup
-        // We remove every pending fork who is more than N blocks behind
+        // We remove every pending fork that is more than N blocks behind the main head.
         self.pending_forks.retain(|_, chain| {
             let chain_len = chain.last().map(|block| block.index_in_chain()).unwrap_or(0);
-            chain_len as i64 > len as i64 - 2
+            chain_len as i64 > len as i64 - SAFE_HORIZON
         });
 
     }
@@ -106,10 +109,24 @@ impl Blockchain {
         self.chain.len()
     }
 
+    pub fn has_transaction(&self, tx: &SimpleTransaction) -> bool {
+        self.chain.iter().any(|block| block.transactions() == tx)
+    }
+    
+    /// Returns true if the transaction is written before the 'safe' horizon,
+    /// which mean that we consider that all workers have agreed upon this position.
+    pub fn is_transaction_safely_written(&self, tx: &SimpleTransaction) -> bool {
+        if self.chain.len() < SAFE_HORIZON as usize {
+            return false;
+        }
+        self.chain[..self.chain.len() - SAFE_HORIZON as usize].iter().any(|block| block.transactions() == tx)
+    }
+
     pub fn print_chain(&self) {
         log::info!("Main chain size          : {}", self.len());
+        self.chain.iter().for_each(|b| log::info!("     ^ {:?}", b.transactions()));
         log::info!("Number of pending forks  : {}", self.pending_forks.len());
-        self.chain.iter().for_each(|b| log::info!("     ^ {:} --> {:?}", b.hash(), b.transactions()))
+        self.pending_forks.iter().for_each(|(_, blocks)| log::info!("  * size of fork = {}", blocks.len()));
     }
 
 }

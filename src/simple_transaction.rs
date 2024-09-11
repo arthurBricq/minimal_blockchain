@@ -1,9 +1,10 @@
+use std::fmt::{Debug, Formatter};
 use serde::{Deserialize, Serialize};
 
 /// A very simple transaction that can be shared on the network
 /// The goal of saving this transaction on the blockchain is to have its record written immutably across
 /// many computers.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 #[derive(Serialize, Deserialize)]
 pub struct SimpleTransaction {
     message: String,
@@ -28,5 +29,11 @@ impl SimpleTransaction {
 
     pub fn to_string(&self) -> String {
         self.message.clone()
+    }
+}
+
+impl Debug for SimpleTransaction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\"{}\"", self.message)
     }
 }

@@ -1,12 +1,17 @@
 use repyh::server::{run_web_server, Server};
 use repyh::simple_transaction::SimpleTransaction;
 use std::sync::{Arc, Mutex};
-
+use env_logger::Env;
 
 /// The server is in charge of
 /// - keeping track of pending transactions.
 /// - responding to clients who want to submit new transactions.
 fn main() {
+    let env = Env::default()
+        .filter_or("MY_LOG_LEVEL", "info")
+        .write_style_or("MY_LOG_STYLE", "always");
+    env_logger::init_from_env(env);
+    
     let mut server = Server::new();
 
     // Submit a bunch of transaction

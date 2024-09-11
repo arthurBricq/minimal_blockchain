@@ -17,6 +17,7 @@ impl Block {
     pub fn genesis() -> Self {
         Self {
             transactions: SimpleTransaction::from_str(""),
+            // This nonce was generated for a difficulty of 5 zeros
             nonce: 1293653,
             index_in_chain: 0,
             previous_hash: None
@@ -110,5 +111,4 @@ mod tests {
         let b2_parsed: Block = serde_json::from_str(&as_json).unwrap();
         assert_eq!(b2.hash(), b2_parsed.hash());
     }
-    
 }

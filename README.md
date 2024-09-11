@@ -2,11 +2,15 @@
 
 A simple blockchain to store **text information** immutably across the network.
 
-- Transactions are just plain text: they are not signed, nor do they keep track of whom sent them.
+- **Transactions** are just plain text: they are not signed, nor do they keep track of whom sent them. They can be written exactly once on the blockchain.
 
 - Workers communicate between themselves on a P2P network (`libp2p.rs`) when they finish to mine. This allows other workers to abort mining if they found the block to be valid.
 
+- Workers are able to track blockchain divergence across time, by basically keep track of several chains. AS soon as one becomes longer than the others, this chain becomes the new 'main' chain.
+
 - There is a centralized web server (`server.rs`) which acts as the **mempool** of the network. Each node request the server a new transaction through a `GET` request.
+
+- Transaction are deleted server from the mempool when the message is written deep enough in the blockchain representation of the server.
 
 # Getting started
 
@@ -32,9 +36,11 @@ cargo run --bin node
 
 List of remaining challenges
 
-1. Blockchain divergence: when two workers finish to mine at roughly the same time, they will both have the time to dispatch their node and they will both 
-2. Removing pending transactions from the server
-3. Downloading the chain from other workers when a new worker connects.
+1. Blockchain divergence usually takes a few iteration to be resolved.
+
+2. Downloading the chain from other workers when a new worker connects.
+
+3. Even though it is unit-tested, there seems to be problems with keeping track of the divergence
 
 # Resources
 

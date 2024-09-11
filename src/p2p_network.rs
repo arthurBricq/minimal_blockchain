@@ -63,7 +63,6 @@ async fn handle_swarm(
         tokio::time::sleep(Duration::from_secs(1)).await;
         select! {
             Some(msg) = rx_local_blocks.recv() => {
-                println!("   (about to broadcast)  ");
                 if let Err(e) = swarm
                     .behaviour_mut().gossipsub
                     .publish(topic.clone(), msg.as_bytes()) {
