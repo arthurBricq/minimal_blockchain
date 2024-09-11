@@ -6,6 +6,7 @@ pub struct Blockchain {
     chain: Vec<Block>,
     /// A hypothesis starts from an index 'n' and contains a chain of blocks.
     /// Each hypothesis is keyed by the block hash at which divergence started.
+    // TODO (optimization) store the index of the root instead of storing the hash of the root
     pending_forks: HashMap<String, Vec<Block>>,
 }
 
@@ -146,5 +147,47 @@ mod tests {
         assert_eq!(3, chain.len());
         chain.resolve_pending_forks();
         assert_eq!(4, chain.len());
+
+        // And there should not be anymore pending forks
+        assert_eq!(0, chain.pending_forks.len());
+    }
+    
+    #[test]
+    fn test_blockchain_divergence_when_main_chain_is_longer_at_resolution() {
+        let mut chain = Blockchain::new();
+
+        // Create a first block and add it to the chain
+        let b1 = chain.get_candidate_block(SimpleTransaction::new());
+        chain.add_block_safe(b1);
+
+        // Create two blocks on top of B1
+        let b2 = chain.get_candidate_block(SimpleTransaction::from_str("left"));
+        let b3 = chain.get_candidate_block(SimpleTransaction::from_str("right"));
+
+        // Add one of them first
+        chain.add_block_safe(b2.clone());
+
+        // You can't add the next one
+        assert_eq!(false, chain.add_block_safe(b3));
+
+        // But b3 should be stored in a pending fork.
+        assert_eq!(1, chain.pending_forks.len());
+
+        // Create a new block on top of b2
+        let b4 = Block::new_after_block(SimpleTransaction::from_str("I was easy to mine..."), &b2);
+
+        // This one can be merged
+        assert_eq!(true, chain.add_block_safe(b4));
+
+        // There should still be only a single pending fork
+        assert_eq!(1, chain.pending_forks.len());
+
+        // But the main branch should not change here !
+        assert_eq!(4, chain.len());
+        chain.resolve_pending_forks();
+        assert_eq!(4, chain.len());
+        
+        // And there should not be anymore pending forks
+        assert_eq!(0, chain.pending_forks.len());
     }
 }
