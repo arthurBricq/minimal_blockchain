@@ -68,7 +68,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     }
                     chain.lock().unwrap().print_chain();
                 }
-                
             }
             // This branch is necessary to 'listen' for mining finished
             val = rx1 => {}

@@ -3,7 +3,7 @@ use std::fmt::{Debug, Formatter};
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Block {
     transactions: SimpleTransaction,
     previous_hash: Option<String>,
@@ -78,6 +78,10 @@ impl Block {
         log::info!("  * previous = {:?}", self.previous_hash().unwrap());
         log::info!("  * hash     = {}", self.hash());
         log::info!("  * data     = {:?}", self.transactions);
+    }
+
+    pub fn index_in_chain(&self) -> u64 {
+        self.index_in_chain
     }
 }
 
