@@ -69,10 +69,10 @@ impl Block {
     }
     
     pub fn print_block(&self) {
-        println!("  * nonce    = {}", self.nonce());
-        println!("  * previous = {:?}", self.previous_hash().unwrap());
-        println!("  * hash     = {}", self.hash());
-        println!("  * data     = {:?}", self.transactions);
+        log::info!("  * nonce    = {}", self.nonce());
+        log::info!("  * previous = {:?}", self.previous_hash().unwrap());
+        log::info!("  * hash     = {}", self.hash());
+        log::info!("  * data     = {:?}", self.transactions);
     }
 }
 

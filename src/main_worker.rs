@@ -30,6 +30,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     p2p_network::join_p2p_network(rx_local_block, tx_network_blocks).expect("TODO: panic message");
     
     // Leave some initial time so that the P2P network setup correctly
+    log::info!("P2P initialized. Waiting for a small delay for initialization to finish...");
     tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
     
     let chain = Arc::new(Mutex::new(Blockchain::new()));
