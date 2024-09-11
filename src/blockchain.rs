@@ -1,5 +1,5 @@
 use std::cmp::max;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use crate::block::Block;
 use crate::simple_transaction::SimpleTransaction;
 
@@ -13,6 +13,8 @@ pub struct Blockchain {
     /// The forked chain is then a list of blocks starting from this hash.
     /// TODO (optimization) store the index of the root instead of storing the hash of the root
     pending_forks: HashMap<String, Vec<Block>>,
+    /// A pool of blocks that worker received but that can't be attached to no other. 
+    orphan: VecDeque<Block>
 }
 
 impl Blockchain {
@@ -21,7 +23,8 @@ impl Blockchain {
         let genesis = Block::genesis();
         Self {
             chain: vec![genesis],
-            pending_forks: HashMap::new()
+            pending_forks: HashMap::new(),
+            orphan: VecDeque::new()
         }
     }
     
@@ -34,11 +37,13 @@ impl Blockchain {
     pub fn add_block_safe(&mut self, block: Block) -> bool {
         // The previous hash is the key that indicates where this block is linked.
         let previous_hash = block.previous_hash().unwrap();
+
         // Try to add this block to the main chain
-        if previous_hash == self.chain.last().unwrap().hash() {
+        let respoonse = if previous_hash == self.chain.last().unwrap().hash() {
             self.chain.push(block);
             true
         } else {
+            // Try to place this block at the head of one of the forked chain
             for (_, chain) in &mut self.pending_forks {
                 // Try to place this block on the given chain
                 if previous_hash == chain.last().unwrap().hash() {
@@ -47,11 +52,30 @@ impl Blockchain {
                 }
             }
 
-            // If we arrived here, it means that not a single hypothesis could accept the new block
-            // So we create a new one.
-            self.pending_forks.insert(previous_hash, vec![block]);
-            return false;
-        }
+            // If we arrived here, it means that
+            // - not a single hypothesis could accept the new block at his head)
+            // - the main chain could not
+            // There are two possibilities now
+            // 1. This block is the start of a new fork
+            //    In this case, we can check whether the previous hash is in the main chain
+            // 2. This block was received 'too' early and is not attached to any of the previous
+            //    block. This happens when the communication fails. In this case, we store it
+            //    and will try later on to fit it somewhere
+
+            let is_new_fork = self.chain.iter().any(|block| block.hash() == previous_hash);
+            if is_new_fork {
+                self.pending_forks.insert(previous_hash, vec![block]);
+            } else {
+                self.orphan.push_back(block);
+            }
+
+            false
+        };
+        
+        
+        
+        
+        respoonse
     }
 
     /// We check all the hypothesis over our main chain.
@@ -137,7 +161,7 @@ impl Blockchain {
         self.pending_forks.iter().for_each(|(start_hash, blocks)| {
             if let Some(root) = self.chain.iter().position(|b| &b.hash() == start_hash) {
                 log::info!(" ~ new fork");
-                print_single_chain(root + 1, blocks);
+                print_single_chain(root, blocks);
             }
         });
     }
@@ -245,6 +269,9 @@ mod tests {
         assert_eq!(2, chain.len());
         chain.add_block_safe(b3);
         assert_eq!(2, chain.len());
+        
+        // We can now check that we have 1 orphan block
+        assert_eq!(1, chain.orphan.len());
 
         // But after you send `b2`, the chain must not be of size '3' but indeed of size '4'
         // It should detect that it can create a new chain longer

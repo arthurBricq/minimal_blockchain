@@ -44,7 +44,7 @@ List of remaining challenges
 
 3. Even though it is unit-tested, there seems to be problems with keeping track of the divergence
 
-4. When nodes are received in the wrong order, divergence is not handled. If one worker is lucky and mines really fast A->B->C, it is possible that another worker reads 'C' before 'B'. Therefore, the worker 'previous hash' of 'C' will not exist.
+4. **Orphan blocks** : when nodes are received in the wrong order, divergence is not handled. If one worker is lucky and mines really fast A->B->C, it is possible that another worker reads 'C' before 'B'. Therefore, the worker 'previous hash' of 'C' will not exist.
 
 # Resources
 
