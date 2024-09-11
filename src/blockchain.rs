@@ -10,9 +10,8 @@ pub struct Blockchain {
 impl Blockchain {
     /// Creates a new blockchain, containing a single block, the genesis.
     pub fn new() -> Self {
-        let mut genesis = Block::genesis(SimpleTransaction::from_str(""));
+        let mut genesis = Block::genesis();
         // This nonce was generated for a difficulty of 5 zeros
-        genesis.set_nonce(1293653);
         Self {
             chain: vec![genesis],
             hypothesis: vec![]
@@ -61,10 +60,6 @@ impl Blockchain {
             if i > 3 || n - i - 1 < 0{
                 return 
             }
-            
-            let block_behind = &self.chain[i];
-            
-            
             
         }
     }

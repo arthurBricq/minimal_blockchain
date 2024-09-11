@@ -1,8 +1,5 @@
 pub mod block;
-pub mod transaction;
+pub mod blockchain;
 pub mod mining;
-pub mod client;
-pub mod pool;
 pub mod server;
 pub mod simple_transaction;
-pub mod blockchain;

@@ -10,46 +10,10 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_util::sync::CancellationToken;
 use repyh::blockchain::Blockchain;
+use repyh::mining::mine;
 
-mod worker;
 mod p2p_network;
 
-/// Sends http request in async rust
-async fn async_req(url: &str, client: reqwest::Client) -> Result<reqwest::Response, Box<dyn Error>> {
-    let response = client
-        .get(url)
-        .timeout(std::time::Duration::from_secs(180))
-        .send()
-        .await?;
-    Ok(response)
-}
-
-/// Find the nonce for which the bytes of the given block match a pattern
-/// starting with N zeros, where `N` is the `difficulty` argument.
-pub async fn mine(
-    block: &mut Block,
-    difficulty: usize,
-    cancellation_token: CancellationToken
-) -> Option<String> {
-    let start_pattern = String::from_utf8(vec![b'0'; difficulty]).unwrap();
-
-    // We are looking for an output that starts with a certain number of zeros
-    for nonce in 0..u64::MAX {
-        // look for a start with N zeros
-        block.set_nonce(nonce);
-        let hash = block.hash();
-        if hash.starts_with(&start_pattern) {
-            return Some(hash)
-        }
-
-        // Always check if this thread was asked to be cancelled
-        if cancellation_token.is_cancelled() {
-            return None
-        }
-    }
-
-    None
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -57,7 +21,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .filter_or("MY_LOG_LEVEL", "info")
         .write_style_or("MY_LOG_STYLE", "always");
     env_logger::init_from_env(env);
-    log::info!("starting up");
 
     let (tx_local_block, rx_local_block) = mpsc::unbounded_channel();
     let (tx_network_blocks, mut rx_network_blocks) = mpsc::unbounded_channel::<String>();
@@ -78,13 +41,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let cloned_client = client.clone();
         let cloned_tx = tx_local_block.clone();
         let cloned_chain = chain.clone();
-        // let tx1_c = tx1.clon
 
-        let (mut tx1, rx1) = oneshot::channel();
+        let (tx1, rx1) = oneshot::channel();
 
         // Create a new task, but don't await on the task
         tokio::spawn(async move {
-            request_new_transaction_and_work(cloned_tx, cloned_client, cloned_token, cloned_chain, tx1).await;
+            request_transaction_and_work(cloned_tx, cloned_client, cloned_token, cloned_chain, tx1).await;
         });
 
         tokio::select! {
@@ -109,14 +71,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
             // This branch is necessary to 'listen' for mining finished
             val = rx1 => {}
         }
-
-
     }
 
 
 }
 
-async fn request_new_transaction_and_work(
+/// * Ask the transaction server for a new transaction to mine
+/// * Start to mine while listening for cancellation
+/// * If mining finished, forward your block to the network
+async fn request_transaction_and_work(
     tx_local_block: UnboundedSender<String>,
     client: Client,
     cancellation_token: CancellationToken,
@@ -166,4 +129,14 @@ async fn request_new_transaction_and_work(
     }
     
     Ok(())
+}
+
+/// Sends http request in async rust
+async fn async_req(url: &str, client: reqwest::Client) -> Result<reqwest::Response, Box<dyn Error>> {
+    let response = client
+        .get(url)
+        .timeout(std::time::Duration::from_secs(180))
+        .send()
+        .await?;
+    Ok(response)
 }

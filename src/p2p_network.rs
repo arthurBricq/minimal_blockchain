@@ -18,10 +18,12 @@ struct P2PBlockSharingBehavior {
     mdns: mdns::tokio::Behaviour,
 }
 
+/// Joins the P2P local network
 pub fn join_p2p_network(
     rx_local_blocks: UnboundedReceiver<String>,
     tx_network_blocks: UnboundedSender<String>
-) -> Result<JoinHandle<()>, Box<dyn Error>> {
+) -> Result<JoinHandle<()>, Box<dyn Error>> 
+{
     let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .try_init();
@@ -49,7 +51,8 @@ async fn handle_swarm(
     topic: gossipsub::IdentTopic,
     mut rx_local_blocks: UnboundedReceiver<String>,
     mut tx_network_blocks: UnboundedSender<String>
-) {
+) 
+{
     log::info!("Joining swarm ...");
 
     // Read full lines from stdin
@@ -99,6 +102,7 @@ async fn handle_swarm(
 
 }
 
+/// Returns the configured and build swarm
 fn build_libp2p_swarm() -> Result<Swarm<P2PBlockSharingBehavior>, Box<dyn Error>> {
     let swarm = libp2p::SwarmBuilder::with_new_identity()
         .with_tokio()

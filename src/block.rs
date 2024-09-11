@@ -12,10 +12,12 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn genesis(transactions: SimpleTransaction) -> Self {
+    /// Creates the original block
+    /// This is a block with no data and with a nonce computed for a difficulty of 5 zeros.
+    pub fn genesis() -> Self {
         Self {
-            transactions,
-            nonce: 0,
+            transactions: SimpleTransaction::from_str(""),
+            nonce: 1293653,
             index_in_chain: 0,
             previous_hash: None
         }
@@ -23,10 +25,12 @@ impl Block {
 
     /// Build a new block located after the given block.
     pub fn new_after_block(data: SimpleTransaction, previous: &Block) -> Self {
-        let mut block = Self::genesis(data);
-        block.previous_hash = Some(previous.hash());
-        block.index_in_chain = previous.index_in_chain + 1;
-        block
+        Self {
+            transactions: data,
+            previous_hash: Some(previous.hash()),
+            nonce: 0,
+            index_in_chain: previous.index_in_chain + 1
+        }
     }
 
     pub fn set_nonce(&mut self, nonce: u64) {
@@ -85,7 +89,7 @@ mod tests {
 
     #[test]
     fn test_hash_consistency()  {
-        let mut b1 = Block::genesis(SimpleTransaction::new());
+        let mut b1 = Block::genesis();
         b1.set_nonce(1234);
         let as_json = serde_json::to_string(&b1).unwrap();
         let b1_parsed: Block = serde_json::from_str(&as_json).unwrap();

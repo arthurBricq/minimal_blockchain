@@ -1,9 +1,12 @@
 use crate::simple_transaction::SimpleTransaction;
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 use rand::Rng;
+use rouille::{router, Response};
 use crate::block::Block;
 use crate::blockchain::Blockchain;
 
+/// Server in charge of keeping track of the pending transactions
 pub struct Server {
     /// Pool of pending transactions
     mempool: VecDeque<SimpleTransaction>,
@@ -44,4 +47,44 @@ impl Server {
             false
         }
     }
+}
+
+const ACCEPTED: &str = "Accepted";
+
+const REJECTED: &str = "Rejected";
+
+/// Launch a webserver, associated with a transaction server, that will
+/// answer to workers.
+pub fn run_web_server(server: Arc<Mutex<Server>>) {
+    rouille::start_server("localhost:8000", move |request| {
+        router!(request,
+            (GET) (/get_transaction) => {
+                // Worker ask for a random transaction in the list from the pending ones
+                println!("Worker ask for previous transaction !");
+                if let Some(transaction) = server.lock().unwrap().get_pending_transaction() {
+                    let as_json = serde_json::to_string(&transaction).unwrap();
+                    Response::text(as_json)
+                } else {
+                    Response::text("")
+                }
+            },
+
+            (GET) (/submit_block/{data: String}) => {
+                // Parse the block sent by the client
+                let received: Block = serde_json::from_str(&data).unwrap();
+
+                // TODO This is not the consensus protocol
+                //      I have to change this, somehow.
+                // Try to append it to the server
+                if server.lock().unwrap().add_block_safe(received) {
+                    Response::text(ACCEPTED)
+                } else {
+                    Response::text(REJECTED)
+                }
+            },
+
+            _ => Response::empty_404()
+        )
+    });
+
 }

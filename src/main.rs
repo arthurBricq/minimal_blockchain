@@ -9,7 +9,7 @@ fn main() {
     let tx2 = SimpleTransaction::from_str("Arthur bought a book from Arnaud");
 
     // Mine the first block
-    let mut genesis = Block::genesis(tx1);
+    let mut genesis = Block::genesis();
     let hash = mining::mine(&mut genesis, DIFFICULTY);
     println!("result =  {hash}");
     println!("block  =  {genesis:?}");
