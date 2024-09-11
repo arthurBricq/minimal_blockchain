@@ -26,7 +26,8 @@ impl Blockchain {
         self.chain.push(block);
     }
 
-    /// Returns true if the main chain was updated.
+    /// Returns true if the main chain was updated, false otherwise.
+    /// If the block is not set inserted in the main chain, it is kept as a hypothesis.
     pub fn add_block_safe(&mut self, block: Block) -> bool {
         // The previous hash is the key that indicates where this block is linked.
         let previous_hash = block.previous_hash().unwrap();
@@ -53,8 +54,8 @@ impl Blockchain {
     /// We check all the hypothesis over our main chain.
     /// If one of them is longer, then we switch to this one.
     pub fn resolve_pending_forks(&mut self) {
-        let len = (self.chain.len() - 1) as u64; 
-         
+        let len = (self.chain.len() - 1) as u64;
+
         // Find the longest chain among the forks
         let best_fork = self.pending_forks
             .iter()
@@ -63,14 +64,15 @@ impl Blockchain {
             ).max_by_key(|(_, chain)|
                 chain.last().map(|block| block.index_in_chain()).unwrap_or(0)
             );
-        
+
         // If we have found a better fork, then perform the swapping
         if best_fork.is_some() {
             // Remove the best fork from the pending ones.
             // This allows us to get ownership.
             let start = best_fork.unwrap().0.clone();
             let new_chain = self.pending_forks.remove(&start).unwrap();
-            
+            log::error!("WE ARE SWAPPING THE MAIN BRANCH");
+
             if let Some(root) = self.chain.iter().position(|b| b.hash() == start) {
                 // Remove everything after the root
                 self.chain.truncate(root + 1);
@@ -81,14 +83,14 @@ impl Blockchain {
                 }
             }
         }
-        
+
         // Chain cleanup
         // We remove every pending fork who is more than N blocks behind
         self.pending_forks.retain(|_, chain| {
             let chain_len = chain.last().map(|block| block.index_in_chain()).unwrap_or(0);
-            chain_len as i64 > len as i64 - 10
+            chain_len as i64 > len as i64 - 2
         });
-  
+
     }
     
     pub fn last_transaction(&self) -> &SimpleTransaction {
@@ -105,7 +107,8 @@ impl Blockchain {
     }
 
     pub fn print_chain(&self) {
-        log::info!("Chain size          : {}", self.len());
+        log::info!("Main chain size          : {}", self.len());
+        log::info!("Number of pending forks  : {}", self.pending_forks.len());
         self.chain.iter().for_each(|b| log::info!("     ^ {:} --> {:?}", b.hash(), b.transactions()))
     }
 
@@ -121,33 +124,33 @@ mod tests {
     #[test]
     fn test_blockchain_divergence_when_divergent_chain_is_longer_at_resolution() {
         let mut chain = Blockchain::new();
-        
+
         // Create a first block and add it to the chain
         let b1 = chain.get_candidate_block(SimpleTransaction::new());
         chain.add_block_safe(b1);
-        
+
         // Create two blocks on top of B1
         let b2 = chain.get_candidate_block(SimpleTransaction::from_str("left"));
         let b3 = chain.get_candidate_block(SimpleTransaction::from_str("right"));
-        
+
         // Add one of them first
         chain.add_block_safe(b2);
-        
+
         // You can't add the next one
         assert_eq!(false, chain.add_block_safe(b3.clone()));
-        
+
         // But b3 should be stored in a pending fork.
         assert_eq!(1, chain.pending_forks.len());
-        
+
         // Create a new block on top of b3
         let b4 = Block::new_after_block(SimpleTransaction::from_str("I was easy to mine..."), &b3);
-        
+
         // This one too should not be merged.
         assert_eq!(false, chain.add_block_safe(b4.clone()));
-        
+
         // There should still be only a single pending fork
         assert_eq!(1, chain.pending_forks.len());
-        
+
         // If we ask for a resolution now, the main chain must be swap and must now have one more block
         assert_eq!(3, chain.len());
         chain.resolve_pending_forks();
@@ -156,7 +159,7 @@ mod tests {
         // And there should not be anymore pending forks
         assert_eq!(0, chain.pending_forks.len());
     }
-    
+
     #[test]
     fn test_blockchain_divergence_when_main_chain_is_longer_at_resolution() {
         let mut chain = Blockchain::new();
@@ -191,7 +194,7 @@ mod tests {
         assert_eq!(4, chain.len());
         chain.resolve_pending_forks();
         assert_eq!(4, chain.len());
-        
+
         // And there should still be the pending fork, because maybe some more nodes will come later on
         assert_eq!(1, chain.pending_forks.len());
     }

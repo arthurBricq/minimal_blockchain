@@ -44,11 +44,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let cloned_tx = tx_local_block.clone();
         let cloned_chain = chain.clone();
 
-        let (tx1, rx1) = oneshot::channel();
+        let (mining_finished_signal, mining_finished_received) = oneshot::channel();
 
         // Create a new task, but don't await on the task
         tokio::spawn(async move {
-            request_transaction_and_mine(cloned_tx, cloned_client, cloned_token, cloned_chain, tx1).await;
+            request_transaction_and_mine(cloned_tx, cloned_client, cloned_token, cloned_chain, mining_finished_signal).await;
         });
 
         tokio::select! {
@@ -70,7 +70,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             // This branch is necessary to 'listen' for mining finished
-            val = rx1 => {}
+            val = mining_finished_received => {}
         }
     }
 
@@ -85,7 +85,7 @@ async fn request_transaction_and_mine(
     client: Client,
     cancellation_token: CancellationToken,
     chain: Arc<Mutex<Blockchain>>,
-    tx1: oneshot::Sender<()>,
+    mining_finished_signal: oneshot::Sender<()>,
 ) -> Result<(), Box<dyn Error>> 
 {
 
@@ -114,16 +114,14 @@ async fn request_transaction_and_mine(
                 tx_local_block
                     .send(serde_json::to_string(&new_block).unwrap())
                     .expect("Broadcasting mined block did not work.");
-
-                // Communicate to the server that this block was mined.
-                tx1.send(()).unwrap();
-
+                
                 // Set it in the chain.
                 chain.lock().unwrap().add_block_unsafe(new_block);
-
+                chain.lock().unwrap().resolve_pending_forks();
                 chain.lock().unwrap().print_chain();
 
-                // Swap the token...
+                // Send an interruption for the asynchronous system to retriever a loop.
+                mining_finished_signal.send(()).unwrap();
                 cancellation_token.cancel();
             }
         }
